@@ -22,16 +22,26 @@ void VB_Planner::PrincipalAnalysis() {
     vector(0) = eigen_vectors(0,0);
     vector(1) = eigen_vectors(0,1);
     vector(2) = eigen_vectors(0,2);
-    float norm;
+    float norm = sqrt(vector(0)*vector(0) + vector(1)*vector(1));
+    principal_direction_.x = vector(0) / norm;
+    principal_direction_.y = vector(1) / norm;
     // TODO !!!
     
-
-
 }
 
 void VB_Planner::ElasticRawCast() {
     // Input: PointCloud; and Principal direction vector
     // Output: update goal waypoint -- the travel distance to an obstacle
+}
+
+void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
+    odom_ = odom_msg;
+    double roll, pitch, yaw;
+    geometry_msgs::Quaternion geo_quat = odometry_msg->pose.pose.orientation;
+    tf::Matrix3x3(tf::Quaternion(geo_quat.x, geo_quat.y, geo_quat.z, geo_quat.w)).getRPY(roll, pitch, yaw);
+    robot_heading.x = cos(yaw);
+    robot_heading.y = sin(yaw);
+
 
 }
 
