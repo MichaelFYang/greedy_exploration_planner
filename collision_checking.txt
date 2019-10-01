@@ -1,0 +1,25 @@
+void CheckCollision(PCLCloud::Ptr & path_cloud, PCLCloud::Ptr & collision_cloud, double collision_check_dist, PCLCloud::Ptr & in_collision_cloud)
+    {
+        pcl::KdTreeFLANN<PCLPoint>::Ptr kdtree_collision_cloud(new pcl::KdTreeFLANN<PCLPoint>());
+        kdtree_collision_cloud->setInputCloud(collision_cloud);
+        std::vector<int> pointSearchInd;
+        std::vector<float> pointSearchSqDis;
+        for(auto & point : path_cloud->points)
+        {
+            kdtree_collision_cloud->radiusSearch(point, collision_check_dist, pointSearchInd, pointSearchSqDis);
+            if(!pointSearchInd.empty())
+            {
+                point.intensity = 0.0;
+                for(auto & idx : pointSearchInd)
+                {
+                   collision_cloud->points[idx].intensity = 1.0;
+                   in_collision_cloud->points.push_back(collision_cloud->points[idx]);
+                }
+            }
+            else
+            {
+                point.intensity = 1.0;
+            }
+        }
+
+    }

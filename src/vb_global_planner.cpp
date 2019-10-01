@@ -32,11 +32,18 @@ VB_Planner::VB_Planner() {
     }
 }
 
+Point VB_Planner::CPoint(float x, float y) {
+    Point p;
+    p.x = x;
+    p.y = y;
+    return p;
+}
+
 void VB_Planner::Loop() {
     // Loop Subscriber
-    goal_pub_ = nh_.advertise<geometry_msgs::PointStamped>("_",1);
-    point_cloud_sub_ = nh_.subscribe("_",1,&VB_Planner::CloudHandler,this);
-    odom_sub_ = nh_.subscribe("_",1,&VB_Planner::OdomHandler,this);
+    goal_pub_ = nh_.advertise<geometry_msgs::PointStamped>(goal_topic_,1);
+    point_cloud_sub_ = nh_.subscribe(laser_topic_,1,&VB_Planner::CloudHandler,this);
+    odom_sub_ = nh_.subscribe(odom_topic_,1,&VB_Planner::OdomHandler,this);
     ros::spin();
 }
 
@@ -97,9 +104,7 @@ bool VB_Planner::HitObstacle(Point p) {
 void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
     // Credit: CMU SUB_T dfs_behavior_planner, Chao C.,
     // https://bitbucket.org/cmusubt/dfs_behavior_planner/src/master/src/dfs_behavior_planner/dfs_behavior_planner.cpp
-
     odom_ = odom_msg;
-    goal_waypoint_.header = odom_.header;
     double roll, pitch, yaw;
     geometry_msgs::Quaternion geo_quat = odometry_msg->pose.pose.orientation;
     tf::Matrix3x3(tf::Quaternion(geo_quat.x, geo_quat.y, geo_quat.z, geo_quat.w)).getRPY(roll, pitch, yaw);
@@ -107,25 +112,32 @@ void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
     robot_heading_.y = sin(yaw);
 }
 
-Point VB_Planner::CPoint(float x, float y) {
-    Point p;
-    p.x = x;
-    p.y = y;
-    return p;
+void VB_Planner::HandleWaypoint() {
+    goal_waypoint_.header = odom_.header;
+    goal_pub_.publish(goal_waypoint_);
+    std::cout << "Goal Publihsed ..." << std::endl;
 }
-
 
 void VB_Planner::CloudHandler(const sensor_msgs::PointCloud2ConstPtr laser_msg) {
     // Take laser cloud -> update Principal Direction
     laser_cloud_->clear();
     pcl::fromROSMsg(*laser_msg, *laser_cloud_);
-    kdtree_collision_cloud_->setInputCloud(laser_cloud_);
+    this->LaserCloudFilter();
+    kdtree_collision_cloud_->setInputCloud(laser_cloud_filtered_);
     this->PrincipalAnalysis(); // update 
     this->ElasticRawCast(); // update waypoint 
     this->HandleWaypoint(); // Log frame id, etc. -> goal 
 
 }
 
-
+void VB_Planner::LaserCloudFilter() {
+    // Source credit: http://pointclouds.org/documentation/tutorials/passthrough.php
+    pcl::PassThrough<pcl::PointXYZ> cloud_filter;
+    cloud_filter.setInputCloud (laser_cloud_);
+    cloud_filter.setFilterFieldName ("z");
+    cloud_filter.setFilterLimits (sample_height_-0.1, sample_height_+0.1);
+    //pass.setFilterLimitsNegative (true);
+    cloud_filter.filter (*laser_cloud_filtered_);
+}
 
 /* ---------------------------------------------------------------------------- */

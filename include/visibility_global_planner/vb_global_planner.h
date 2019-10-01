@@ -61,6 +61,8 @@ private:
     ROSWayPoint HandleWaypoint();
     void CloudHandler(const sensor_msgs::PointCloud2ConstPtr cloud_msg);
     bool HitObstacle(Point p);
+    void LaserCloudFilter();
+    void HandleWayPoint();
     // valuable define
     nav_msgs::Odometry odom_;
     Point robot_heading_;
@@ -68,6 +70,7 @@ private:
     ROSPoint goal_waypoint_;
     Point principal_direction_;
     pcl::PointCloud<pcl::PointXYZI>::Ptr laser_cloud_(new pcl::PointCloud<pcl::PointXYZI>());
+    pcl::PointCloud<pcl::PointXYZI>::Ptr laser_cloud_filtered_(new pcl::PointCloud<pcl::PointXYZI>());
     pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr kdtree_collision_cloud_(new pcl::KdTreeFLANN<pcl::PointXYZI>());
     // ros  parameter value
     int raw_cast_revolution_;
