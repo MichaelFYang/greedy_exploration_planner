@@ -1,5 +1,5 @@
 
-#include "visibility_global_planner/vb_global_planner.h"
+#include "vb_global_planner/vb_global_planner.h"
 
 /* ---------------------------------------------------------------------------- */
 
@@ -135,7 +135,7 @@ void VB_Planner::LaserCloudFilter() {
     pcl::PassThrough<pcl::PointXYZ> cloud_filter;
     cloud_filter.setInputCloud (laser_cloud_);
     cloud_filter.setFilterFieldName ("z");
-    cloud_filter.setFilterLimits (sample_height_-0.1, sample_height_+0.1);
+    cloud_filter.setFilterLimits (sample_height_-collision_radius_, sample_height_+collision_radius_);
     //pass.setFilterLimitsNegative (true);
     cloud_filter.filter (*laser_cloud_filtered_);
 }

@@ -9,7 +9,7 @@
 #include <Eigen/Dense>
 #include <vector>
 #include <string>
-#include <math>
+#include <math.h>
 
 typedef geometry_msgs::Point ROSPoint;
 typedef geometry_msgs::PointStamped ROSWayPoint; 

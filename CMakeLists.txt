@@ -10,7 +10,9 @@ project(vb_global_planner)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
+  nav_msgs
   geometry_msgs
+  sensor_msgs
   std_msgs
   pcl_ros
 )
@@ -114,6 +116,7 @@ catkin_package(
     CATKIN_DEPENDS
     roscpp
     std_msgs
+    nav_msgs
     geometry_msgs
     sensor_msgs
     pcl_ros
