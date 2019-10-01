@@ -63,6 +63,12 @@ void VB_Planner::ElasticRawCast() {
 }
 
 bool VB_Planner::HitObstacle(Point p) {
+    // Credit: Chao C.,
+    std::vector<int> pointSearchInd;
+    std::vector<float> pointSearchSqDis;
+    pcl::PointXYZI cloud_point;
+    kdtree_collision_cloud->radiusSearch(point, collision_check_dist, pointSearchInd, pointSearchSqDis);
+
     return false;
 }
 
@@ -91,8 +97,13 @@ void VB_Planner::CloudHandler(const sensor_msgs::PointCloud2ConstPtr laser_msg) 
     // Take laser cloud -> update Principal Direction
     laser_cloud_->clear();
     pcl::fromROSMsg(*laser_msg, *laser_cloud_);
+    kdtree_collision_cloud_->setInputCloud(laser_cloud_);
     this->PrincipalAnalysis(); // update 
     this->ElasticRawCast(); // update waypoint 
     this->HandleWaypoint(); // Log frame id, etc. -> goal 
+
 }
 
+
+
+/* ---------------------------------------------------------------------------- */
