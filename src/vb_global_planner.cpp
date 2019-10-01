@@ -14,6 +14,22 @@ VB_Planner::VB_Planner() {
     if (!nh_.getParam("obs_count_thred",obs_count_thred_)) {
         obs_count_thred_ = 50;
     }
+    if (!nh_.getParam("sample_height",sample_height_)) {
+        sample_height_ = 0.3125;
+    }
+    if (!nh_.getParam("collision_radius",collision_radius_)) {
+        collision_radius_ = 0.1;
+    }
+    // get topic name parameter
+    if (!nh_.getParam("_",goal_topic_)) {
+        goal_topic_ = "waypoint";
+    }
+    if (!nh_.getParam("_",laser_topic_)) {
+        laser_topic_ = "lasercloud";
+    }
+    if (!nh_.getParam("_",odom_topic_)) {
+        odom_topic_ = "odom";
+    }
 }
 
 void VB_Planner::Loop() {
@@ -58,8 +74,9 @@ void VB_Planner::ElasticRawCast() {
             counter += 1;
         }
     }
-    goal_waypoint_.point.x = check_;point.x;
-    goal_waypoint_.point.y = check_;point.y;
+    goal_waypoint_.point.x = check_point.x;
+    goal_waypoint_.point.y = check_point.y;
+    goal_waypoint_.point.z = sample_height_;
 }
 
 bool VB_Planner::HitObstacle(Point p) {
@@ -67,8 +84,13 @@ bool VB_Planner::HitObstacle(Point p) {
     std::vector<int> pointSearchInd;
     std::vector<float> pointSearchSqDis;
     pcl::PointXYZI cloud_point;
-    kdtree_collision_cloud->radiusSearch(point, collision_check_dist, pointSearchInd, pointSearchSqDis);
-
+    cloud_point.x = p.x;
+    cloud_point.y = p.y;
+    cloud_point.z = sample_height_;
+    kdtree_collision_cloud->radiusSearch(cloud_point, collision_radius_, pointSearchInd, pointSearchSqDis);
+    if (!pointSearchInd.empty()) {
+        return true;
+    }
     return false;
 }
 
@@ -77,12 +99,12 @@ void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
     // https://bitbucket.org/cmusubt/dfs_behavior_planner/src/master/src/dfs_behavior_planner/dfs_behavior_planner.cpp
 
     odom_ = odom_msg;
+    goal_waypoint_.header = odom_.header;
     double roll, pitch, yaw;
     geometry_msgs::Quaternion geo_quat = odometry_msg->pose.pose.orientation;
     tf::Matrix3x3(tf::Quaternion(geo_quat.x, geo_quat.y, geo_quat.z, geo_quat.w)).getRPY(roll, pitch, yaw);
     robot_heading_.x = cos(yaw);
     robot_heading_.y = sin(yaw);
-
 }
 
 Point VB_Planner::CPoint(float x, float y) {

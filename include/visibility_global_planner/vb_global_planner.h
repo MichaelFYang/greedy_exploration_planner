@@ -8,10 +8,11 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <Eigen/Dense>
 #include <vector>
+#include <string>
 #include <math>
 
 typedef geometry_msgs::Point ROSPoint;
-typedef geometry_msgs::PointStamped ROSWayPoint;
+typedef geometry_msgs::PointStamped ROSWayPoint; 
 
 struct Point {
     float x;
@@ -48,7 +49,8 @@ private:
     ros::NodeHandle nh_;
     ros::Subscriber point_cloud_sub_;
     ros::Subscriber odom_sub_;
-    ros::Publishder goal_pub_;
+    ros::Publisher goal_pub_;
+    ros::Publisher rviz_waypoint_pub_;
     // function define
     Point CPoint(float x, float y);
     float Norm(Point p);
@@ -60,7 +62,6 @@ private:
     void CloudHandler(const sensor_msgs::PointCloud2ConstPtr cloud_msg);
     bool HitObstacle(Point p);
     // valuable define
-
     nav_msgs::Odometry odom_;
     Point robot_heading_;
     Point robot_center_;
@@ -72,6 +73,9 @@ private:
     int raw_cast_revolution_;
     float max_sensor_range_;
     int obs_count_thred_;
+    float sample_height_;
+    float collision_radius_;
+    std::string goal_topic_, laser_topic_, odom_topic_;
 
 
 }
