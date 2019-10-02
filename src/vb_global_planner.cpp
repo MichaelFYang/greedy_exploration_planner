@@ -51,8 +51,9 @@ void VB_Planner::PrincipalAnalysis() {
     //  Output: a 2D vector with the domain direction -- Normlize to Norm 1
     // Using PCA -> eigen vector with maximum eigen value
     Eigen::Matrix3f eigen_vectors;
-    pcl::PCA<pcl::PointXYZI> pca(*laser_cloud_);
-    eigen_vectors = pca.getEigenVectors();
+    pcl::PCA<pcl::PointXYZI> cpca;
+    cpca.setInputCloud(laser_cloud_);
+    eigen_vectors = cpca.getEigenVectors();
     Eigen::Vector3f vector;
 
     vector(0) = eigen_vectors(0,0);
@@ -73,16 +74,16 @@ void VB_Planner::ElasticRawCast() {
     int counter = 0;
     float center_x = odom_.pose.pose.position.x;
     float center_y = odom_.pose.pose.position.y;
-    Point center_pos = this->CPoint(center_x, center_y)
+    Point center_pos = this->CPoint(center_x, center_y);
     Point check_pos = center_pos;
     while(counter < obs_count_thred_ && this->Norm(check_pos - center_pos) < max_sensor_range_) {
-        check_pos += principal_direction_;
+        check_pos = check_pos + principal_direction_;
         if (this->HitObstacle(check_pos)) {
             counter += 1;
         }
     }
-    goal_waypoint_.point.x = check_point.x;
-    goal_waypoint_.point.y = check_point.y;
+    goal_waypoint_.point.x = check_pos.x;
+    goal_waypoint_.point.y = check_pos.y;
     goal_waypoint_.point.z = sample_height_;
 }
 
@@ -94,7 +95,7 @@ bool VB_Planner::HitObstacle(Point p) {
     cloud_point.x = p.x;
     cloud_point.y = p.y;
     cloud_point.z = sample_height_;
-    kdtree_collision_cloud->radiusSearch(cloud_point, collision_radius_, pointSearchInd, pointSearchSqDis);
+    kdtree_collision_cloud_->radiusSearch(cloud_point, collision_radius_, pointSearchInd, pointSearchSqDis);
     if (!pointSearchInd.empty()) {
         return true;
     }
@@ -106,7 +107,7 @@ void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
     // https://bitbucket.org/cmusubt/dfs_behavior_planner/src/master/src/dfs_behavior_planner/dfs_behavior_planner.cpp
     odom_ = odom_msg;
     double roll, pitch, yaw;
-    geometry_msgs::Quaternion geo_quat = odometry_msg->pose.pose.orientation;
+    geometry_msgs::Quaternion geo_quat = odom_msg.pose.pose.orientation;
     tf::Matrix3x3(tf::Quaternion(geo_quat.x, geo_quat.y, geo_quat.z, geo_quat.w)).getRPY(roll, pitch, yaw);
     robot_heading_.x = cos(yaw);
     robot_heading_.y = sin(yaw);
@@ -132,12 +133,12 @@ void VB_Planner::CloudHandler(const sensor_msgs::PointCloud2ConstPtr laser_msg) 
 
 void VB_Planner::LaserCloudFilter() {
     // Source credit: http://pointclouds.org/documentation/tutorials/passthrough.php
-    pcl::PassThrough<pcl::PointXYZ> cloud_filter;
+    pcl::PassThrough<pcl::PointXYZI> cloud_filter;
     cloud_filter.setInputCloud (laser_cloud_);
     cloud_filter.setFilterFieldName ("z");
     cloud_filter.setFilterLimits (sample_height_-collision_radius_, sample_height_+collision_radius_);
     //pass.setFilterLimitsNegative (true);
-    cloud_filter.filter (*laser_cloud_filtered_);
+    cloud_filter.filter(*laser_cloud_filtered_);
 }
 
 /* ---------------------------------------------------------------------------- */
