@@ -141,4 +141,8 @@ void VB_Planner::LaserCloudFilter() {
     cloud_filter.filter(*laser_cloud_filtered_);
 }
 
+float VB_Planner::Norm(Point p) {
+    return sqrt(p.x*p.x + p.y*p.y);
+}
+
 /* ---------------------------------------------------------------------------- */

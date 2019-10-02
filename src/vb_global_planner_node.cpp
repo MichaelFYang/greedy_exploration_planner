@@ -1,6 +1,6 @@
 // ROS Node of implement visibility_global_planner
 
-#include "visibility_global_planner/visibility_global_planner"
+#include "vb_global_planner/vb_global_planner.h"
 
 
 /* ---------------------------------------------------------------------------- */
