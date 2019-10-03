@@ -21,15 +21,21 @@ VB_Planner::VB_Planner() {
         collision_radius_ = 0.1;
     }
     // get topic name parameter
-    if (!nh_.getParam("_",goal_topic_)) {
-        goal_topic_ = "waypoint";
+    if (!nh_.getParam("vb_goal_topic",goal_topic_)) {
+        goal_topic_ = "/way_point";
     }
-    if (!nh_.getParam("_",laser_topic_)) {
-        laser_topic_ = "lasercloud";
+    if (!nh_.getParam("vb_laser_topic",laser_topic_)) {
+        laser_topic_ = "/velodyne_cloud_registered";
     }
-    if (!nh_.getParam("_",odom_topic_)) {
-        odom_topic_ = "odom";
+    if (!nh_.getParam("vb_odom_topic",odom_topic_)) {
+        odom_topic_ = "/integrated_to_map";
     }
+    // initial cloud
+    laser_cloud_ = pcl::PointCloud<pcl::PointXYZI>::Ptr(new pcl::PointCloud<pcl::PointXYZI>());
+    laser_cloud_filtered_ = pcl::PointCloud<pcl::PointXYZI>::Ptr(new pcl::PointCloud<pcl::PointXYZI>());
+    kdtree_collision_cloud_ = pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr(new pcl::KdTreeFLANN<pcl::PointXYZI>());
+   
+    std::cout<<"Initialize Successfully"<<std::endl;
 }
 
 Point VB_Planner::CPoint(float x, float y) {
@@ -125,6 +131,7 @@ void VB_Planner::CloudHandler(const sensor_msgs::PointCloud2ConstPtr laser_msg) 
     pcl::fromROSMsg(*laser_msg, *laser_cloud_);
     this->LaserCloudFilter();
     kdtree_collision_cloud_->setInputCloud(laser_cloud_filtered_);
+    // kdtree_collision_cloud_->setInputCloud(laser_cloud_);
     this->PrincipalAnalysis(); // update 
     this->ElasticRawCast(); // update waypoint 
     this->HandleWaypoint(); // Log frame id, etc. -> goal 
