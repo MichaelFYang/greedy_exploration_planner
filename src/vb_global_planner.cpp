@@ -79,12 +79,14 @@ void VB_Planner::ElasticRawCast() {
     // Input: PointCloud; and Principal direction vector
     // Output: update goal waypoint -- the travel distance to an obstacle
     int counter = 0;
+    std::size_t iter = 0;
     float center_x = robot_pos_.x;
     float center_y = robot_pos_.y;
     Point center_pos = this->CPoint(center_x, center_y);
     Point check_pos = center_pos;
     while(counter < obs_count_thred_ && this->Norm(check_pos - center_pos) < max_sensor_range_) {
-        check_pos = check_pos + principal_direction_;
+        iter += 1;
+        check_pos = check_pos + iter * principal_direction_;
         if (this->HitObstacle(check_pos)) {
             counter += 1;
         }
@@ -134,8 +136,8 @@ void VB_Planner::HandleWaypoint() {
     pose.pose.position.z = robot_pos_.z;
     rviz_direction_.poses.clear();
     rviz_direction_.poses.push_back(pose);
-    pose.pose.position.x = robot_pos_.x + max_sensor_range_ * principal_direction_.x;
-    pose.pose.position.y = robot_pos_.y + max_sensor_range_ * principal_direction_.y;
+    pose.pose.position.x = goal_waypoint_.point.x;
+    pose.pose.position.y = goal_waypoint_.point.y;
     pose.pose.position.z = robot_pos_.z;
     rviz_direction_.poses.push_back(pose);
     // publish waypoint;
