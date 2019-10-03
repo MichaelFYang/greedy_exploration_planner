@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   std_msgs
   pcl_ros
+  misc_utils
 )
 
 ## System dependencies are found with CMake's conventions
@@ -120,6 +121,7 @@ catkin_package(
     geometry_msgs
     sensor_msgs
     pcl_ros
+    misc_utils
 )
 
 ###########

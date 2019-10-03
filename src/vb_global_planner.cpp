@@ -9,16 +9,16 @@ VB_Planner::VB_Planner() {
         raw_cast_revolution_ = 20;
     }
     if (!nh_.getParam("max_sensor_range",max_sensor_range_)) {
-        max_sensor_range_ = 100.0;
+        max_sensor_range_ = 10.0;
     }
     if (!nh_.getParam("obs_count_thred",obs_count_thred_)) {
         obs_count_thred_ = 50;
     }
-    if (!nh_.getParam("sample_height",sample_height_)) {
-        sample_height_ = 0.3125;
-    }
     if (!nh_.getParam("collision_radius",collision_radius_)) {
-        collision_radius_ = 0.1;
+        collision_radius_ = 0.5;
+    }
+     if (!nh_.getParam("robot_frame_id",robot_frame_id_)) {
+        robot_frame_id_ = "X1/base_link";
     }
     // get topic name parameter
     if (!nh_.getParam("vb_goal_topic",goal_topic_)) {
@@ -47,6 +47,7 @@ Point VB_Planner::CPoint(float x, float y) {
 
 void VB_Planner::Loop() {
     // Loop Subscriber
+    rviz_direct_pub_ = nh_.advertise<nav_msgs::Path>("/vb_planner/PCA_direction",1);
     goal_pub_ = nh_.advertise<geometry_msgs::PointStamped>(goal_topic_,1);
     point_cloud_sub_ = nh_.subscribe(laser_topic_,1,&VB_Planner::CloudHandler,this);
     odom_sub_ = nh_.subscribe(odom_topic_,1,&VB_Planner::OdomHandler,this);
@@ -70,7 +71,7 @@ void VB_Planner::PrincipalAnalysis() {
     principal_direction_.y = vector(1) / norm;
     if (principal_direction_ * robot_heading_ < 0) {
         principal_direction_.x *= -1;
-        principal_direction_.x *= -1;
+        principal_direction_.y *= -1;
     }
 }
 
@@ -78,8 +79,8 @@ void VB_Planner::ElasticRawCast() {
     // Input: PointCloud; and Principal direction vector
     // Output: update goal waypoint -- the travel distance to an obstacle
     int counter = 0;
-    float center_x = odom_.pose.pose.position.x;
-    float center_y = odom_.pose.pose.position.y;
+    float center_x = robot_pos_.x;
+    float center_y = robot_pos_.y;
     Point center_pos = this->CPoint(center_x, center_y);
     Point check_pos = center_pos;
     while(counter < obs_count_thred_ && this->Norm(check_pos - center_pos) < max_sensor_range_) {
@@ -90,7 +91,7 @@ void VB_Planner::ElasticRawCast() {
     }
     goal_waypoint_.point.x = check_pos.x;
     goal_waypoint_.point.y = check_pos.y;
-    goal_waypoint_.point.z = sample_height_;
+    goal_waypoint_.point.z = robot_pos_.z;
 }
 
 bool VB_Planner::HitObstacle(Point p) {
@@ -100,7 +101,7 @@ bool VB_Planner::HitObstacle(Point p) {
     pcl::PointXYZI cloud_point;
     cloud_point.x = p.x;
     cloud_point.y = p.y;
-    cloud_point.z = sample_height_;
+    cloud_point.z = robot_pos_.z;
     kdtree_collision_cloud_->radiusSearch(cloud_point, collision_radius_, pointSearchInd, pointSearchSqDis);
     if (!pointSearchInd.empty()) {
         return true;
@@ -112,6 +113,11 @@ void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
     // Credit: CMU SUB_T dfs_behavior_planner, Chao C.,
     // https://bitbucket.org/cmusubt/dfs_behavior_planner/src/master/src/dfs_behavior_planner/dfs_behavior_planner.cpp
     odom_ = odom_msg;
+    rviz_direction_.header = odom_.header;
+    robot_pos_.x = odom_.pose.pose.position.x;
+    robot_pos_.y = odom_.pose.pose.position.y;
+    robot_pos_.z = odom_.pose.pose.position.z;
+
     double roll, pitch, yaw;
     geometry_msgs::Quaternion geo_quat = odom_msg.pose.pose.orientation;
     tf::Matrix3x3(tf::Quaternion(geo_quat.x, geo_quat.y, geo_quat.z, geo_quat.w)).getRPY(roll, pitch, yaw);
@@ -120,9 +126,23 @@ void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
 }
 
 void VB_Planner::HandleWaypoint() {
+    // publish rviz
+    geometry_msgs::PoseStamped pose;
+    pose.header = rviz_direction_.header;
+    pose.pose.position.x = robot_pos_.x;
+    pose.pose.position.y = robot_pos_.y;
+    pose.pose.position.z = robot_pos_.z;
+    rviz_direction_.poses.clear();
+    rviz_direction_.poses.push_back(pose);
+    pose.pose.position.x = robot_pos_.x + max_sensor_range_ * principal_direction_.x;
+    pose.pose.position.y = robot_pos_.y + max_sensor_range_ * principal_direction_.y;
+    pose.pose.position.z = robot_pos_.z;
+    rviz_direction_.poses.push_back(pose);
+    // publish waypoint;
     goal_waypoint_.header = odom_.header;
     goal_pub_.publish(goal_waypoint_);
-    std::cout << "Goal Publihsed ..." << std::endl;
+    rviz_direct_pub_.publish(rviz_direction_);
+    // std::cout << "Goal Publihsed ..." << std::endl;
 }
 
 void VB_Planner::CloudHandler(const sensor_msgs::PointCloud2ConstPtr laser_msg) {
@@ -131,7 +151,6 @@ void VB_Planner::CloudHandler(const sensor_msgs::PointCloud2ConstPtr laser_msg) 
     pcl::fromROSMsg(*laser_msg, *laser_cloud_);
     this->LaserCloudFilter();
     kdtree_collision_cloud_->setInputCloud(laser_cloud_filtered_);
-    // kdtree_collision_cloud_->setInputCloud(laser_cloud_);
     this->PrincipalAnalysis(); // update 
     this->ElasticRawCast(); // update waypoint 
     this->HandleWaypoint(); // Log frame id, etc. -> goal 
@@ -141,9 +160,21 @@ void VB_Planner::CloudHandler(const sensor_msgs::PointCloud2ConstPtr laser_msg) 
 void VB_Planner::LaserCloudFilter() {
     // Source credit: http://pointclouds.org/documentation/tutorials/passthrough.php
     pcl::PassThrough<pcl::PointXYZI> cloud_filter;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr laser_cloud_temp(new pcl::PointCloud<pcl::PointXYZI>());
+    laser_cloud_temp->clear();
+    std::size_t laser_cloud_size = laser_cloud_->points.size();
+    pcl::PointXYZI point;
+    for (std::size_t i=0; i<laser_cloud_size; i++) {
+        point = laser_cloud_->points[i];
+        misc_utils_ns::LeftRotatePoint(point);
+        point.z = robot_pos_.z;
+        laser_cloud_temp->points.push_back(point);
+    }
+    laser_cloud_ = laser_cloud_temp;
+
     cloud_filter.setInputCloud (laser_cloud_);
     cloud_filter.setFilterFieldName ("z");
-    cloud_filter.setFilterLimits (sample_height_-collision_radius_, sample_height_+collision_radius_);
+    cloud_filter.setFilterLimits (robot_pos_.z, robot_pos_.z+collision_radius_);
     //pass.setFilterLimitsNegative (true);
     cloud_filter.filter(*laser_cloud_filtered_);
 }
