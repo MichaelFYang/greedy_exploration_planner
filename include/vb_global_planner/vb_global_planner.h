@@ -16,6 +16,7 @@
 #include <vector>
 #include <string>
 #include <math.h>
+#include <algorithm>
 
 typedef geometry_msgs::Point ROSPoint;
 typedef geometry_msgs::PointStamped ROSWayPoint; 
@@ -23,6 +24,11 @@ typedef geometry_msgs::PointStamped ROSWayPoint;
 struct Point {
     float x;
     float y;
+    bool operator ==(const Point& pt) const
+    {
+        return x == pt.x && y == pt.y;
+    }
+
     float operator *(const Point& pt) const
     {
         return x * pt.x + y * pt.y;
@@ -89,7 +95,7 @@ private:
     // function define
     Point CPoint(float x, float y);
     float Norm(Point p);
-    void PrincipalAnalysis();
+    Point PrincipalAnalysis();
     void ElasticRawCast();
     void InitializeParam();
     void OdomHandler(const nav_msgs::Odometry odom_msg);
@@ -104,6 +110,9 @@ private:
     Point3D robot_pos_;
     ROSWayPoint goal_waypoint_;
     Point principal_direction_;
+    Point old_principla_direction_;
+    Point second_direction_left_;
+    Point second_direction_right_;
     nav_msgs::Path rviz_direction_;
     pcl::PointCloud<pcl::PointXYZI>::Ptr laser_cloud_;
     pcl::PointCloud<pcl::PointXYZI>::Ptr laser_cloud_filtered_;

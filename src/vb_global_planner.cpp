@@ -6,13 +6,13 @@
 VB_Planner::VB_Planner() {
     // ROS Parameter Read 
     if (!nh_.getParam("ray_cast_revolution",raw_cast_revolution_)) {
-        raw_cast_revolution_ = 20;
+        raw_cast_revolution_ = 100;
     }
     if (!nh_.getParam("max_sensor_range",max_sensor_range_)) {
-        max_sensor_range_ = 10.0;
+        max_sensor_range_ = 15.0;
     }
     if (!nh_.getParam("obs_count_thred",obs_count_thred_)) {
-        obs_count_thred_ = 10;
+        obs_count_thred_ = 5;
     }
     if (!nh_.getParam("collision_radius",collision_radius_)) {
         collision_radius_ = 0.5;
@@ -34,7 +34,9 @@ VB_Planner::VB_Planner() {
     laser_cloud_ = pcl::PointCloud<pcl::PointXYZI>::Ptr(new pcl::PointCloud<pcl::PointXYZI>());
     laser_cloud_filtered_ = pcl::PointCloud<pcl::PointXYZI>::Ptr(new pcl::PointCloud<pcl::PointXYZI>());
     kdtree_collision_cloud_ = pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr(new pcl::KdTreeFLANN<pcl::PointXYZI>());
-   
+
+    // initial old principal direciton
+    old_principla_direction_ = this->CPoint(0,0);
     std::cout<<"Initialize Successfully"<<std::endl;
 }
 
@@ -53,7 +55,7 @@ void VB_Planner::Loop() {
 
     odom_sub_ = nh_.subscribe(odom_topic_,1,&VB_Planner::OdomHandler,this);
 
-    ros::Rate rate(0.5);
+    ros::Rate rate(1);
     while(ros::ok())
     {
         ros::spinOnce();
@@ -64,7 +66,7 @@ void VB_Planner::Loop() {
     //ros::spin();
 }
 
-void VB_Planner::PrincipalAnalysis() {
+Point VB_Planner::PrincipalAnalysis() {
     //  Output: a 2D vector with the domain direction -- Normlize to Norm 1
     // Using PCA -> eigen vector with maximum eigen value
     Eigen::Matrix3f eigen_vectors;
@@ -79,10 +81,17 @@ void VB_Planner::PrincipalAnalysis() {
     float norm = sqrt(vector(0)*vector(0) + vector(1)*vector(1));
     principal_direction_.x = vector(0) / norm;
     principal_direction_.y = vector(1) / norm;
-    if (principal_direction_ * robot_heading_ < 0) {
+    if (old_principla_direction_ == this->CPoint(0,0) && principal_direction_ * robot_heading_ < 0) {
+        principal_direction_.x *= -1;
+        principal_direction_.y *= -1;
+    }else if (principal_direction_ * old_principla_direction_ < 0) {
         principal_direction_.x *= -1;
         principal_direction_.y *= -1;
     }
+    second_direction_left_ = this->CPoint(-principal_direction_.y,principal_direction_.x);
+    second_direction_right_ = this->CPoint(principal_direction_.y,-principal_direction_.x);
+
+    return principal_direction_;
 }
 
 void VB_Planner::ElasticRawCast() {
@@ -91,18 +100,53 @@ void VB_Planner::ElasticRawCast() {
     int counter = 0;
     float center_x = robot_pos_.x;
     float center_y = robot_pos_.y;
+    float dist_principal, dist_left, dist_right;
     Point center_pos = this->CPoint(center_x, center_y);
-    Point check_pos = center_pos;
-    while(counter < obs_count_thred_ && this->Norm(check_pos - center_pos) < max_sensor_range_) {
-        check_pos.x += principal_direction_.x;
-        check_pos.y += principal_direction_.y;
+    Point check_pos_principal = center_pos;
+    Point check_pos_left = center_pos;
+    Point check_pos_right = center_pos;
+    // principal direction
+    while(counter < obs_count_thred_ && this->Norm(check_pos_principal - center_pos) < max_sensor_range_) {
+        check_pos_principal.x += principal_direction_.x / raw_cast_revolution_;
+        check_pos_principal.y += principal_direction_.y / raw_cast_revolution_;
 
-        if (this->HitObstacle(check_pos)) {
+        if (this->HitObstacle(check_pos_principal)) {
             counter += 1;
         }
     }
-    goal_waypoint_.point.x = check_pos.x;
-    goal_waypoint_.point.y = check_pos.y;
+    // left direction
+    counter = 0;
+    while(counter < obs_count_thred_ && this->Norm(check_pos_left - center_pos) < max_sensor_range_) {
+        check_pos_left.x += second_direction_left_.x / raw_cast_revolution_;
+        check_pos_left.y += second_direction_left_.y / raw_cast_revolution_;
+
+        if (this->HitObstacle(check_pos_left)) {
+            counter += 1;
+        }
+    }
+    // right direciton
+    counter = 0;
+    while(counter < obs_count_thred_ && this->Norm(check_pos_right - center_pos) < max_sensor_range_) {
+        check_pos_right.x += second_direction_right_.x / raw_cast_revolution_;
+        check_pos_right.y += second_direction_right_.y / raw_cast_revolution_;
+
+        if (this->HitObstacle(check_pos_right)) {
+            counter += 1;
+        }
+    }
+    // refine the movement direction
+    dist_principal = this->Norm(check_pos_principal - center_pos);
+    dist_left = this->Norm(check_pos_left - center_pos);
+    dist_right = this->Norm(check_pos_right - center_pos);
+
+    if (dist_principal < std::max(dist_left,dist_right) / 2) {
+        if (dist_left > 2 * dist_right) {
+            check_pos_principal = check_pos_left;
+        }else check_pos_principal = check_pos_right;
+    }
+
+    goal_waypoint_.point.x = check_pos_principal.x;
+    goal_waypoint_.point.y = check_pos_principal.y;
     goal_waypoint_.point.z = robot_pos_.z;
 }
 
@@ -165,7 +209,7 @@ void VB_Planner::CloudHandler(const sensor_msgs::PointCloud2ConstPtr laser_msg) 
     pcl::fromROSMsg(*laser_msg, *laser_cloud_);
     this->LaserCloudFilter();
     kdtree_collision_cloud_->setInputCloud(laser_cloud_filtered_);
-    this->PrincipalAnalysis(); // update 
+    old_principla_direction_ = this->PrincipalAnalysis(); // update 
     this->ElasticRawCast(); // update waypoint 
     this->HandleWaypoint(); // Log frame id, etc. -> goal 
 
@@ -181,7 +225,7 @@ void VB_Planner::LaserCloudFilter() {
     for (std::size_t i=0; i<laser_cloud_size; i++) {
         point = laser_cloud_->points[i];
         misc_utils_ns::LeftRotatePoint(point);
-        point.z = robot_pos_.z;
+        // point.z = robot_pos_.z;
         laser_cloud_temp->points.push_back(point);
     }
     laser_cloud_ = laser_cloud_temp;
