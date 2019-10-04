@@ -27,19 +27,22 @@ struct Point {
     {
         return x * pt.x + y * pt.y;
     }
+
     Point operator +(const Point& pt) const
     {
-        Point result;
-        result.x += pt.x;
-        result.y += pt.y;
-        return result;
+        Point p;
+        p.x = x + pt.x;
+        p.y = y + pt.y;
+
+        return p;
     }
     Point operator -(const Point& pt) const
     {
-        Point result;
-        result.x -= pt.x;
-        result.y -= pt.y;
-        return result;
+        Point p;
+        p.x = x - pt.x;
+        p.y = y - pt.y;
+        
+        return p;
     }
 };
 
