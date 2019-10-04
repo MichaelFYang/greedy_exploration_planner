@@ -50,8 +50,18 @@ void VB_Planner::Loop() {
     rviz_direct_pub_ = nh_.advertise<nav_msgs::Path>("/vb_planner/PCA_direction",1);
     goal_pub_ = nh_.advertise<geometry_msgs::PointStamped>(goal_topic_,1);
     point_cloud_sub_ = nh_.subscribe(laser_topic_,1,&VB_Planner::CloudHandler,this);
+
     odom_sub_ = nh_.subscribe(odom_topic_,1,&VB_Planner::OdomHandler,this);
-    ros::spin();
+
+    ros::Rate rate(0.5);
+    while(ros::ok())
+    {
+        ros::spinOnce();
+        //process
+        rate.sleep();
+    }
+
+    //ros::spin();
 }
 
 void VB_Planner::PrincipalAnalysis() {
@@ -178,7 +188,7 @@ void VB_Planner::LaserCloudFilter() {
 
     cloud_filter.setInputCloud (laser_cloud_);
     cloud_filter.setFilterFieldName ("z");
-    cloud_filter.setFilterLimits (robot_pos_.z, robot_pos_.z+collision_radius_);
+    cloud_filter.setFilterLimits (robot_pos_.z-2*collision_radius_, robot_pos_.z+2*collision_radius_);
     //pass.setFilterLimitsNegative (true);
     cloud_filter.filter(*laser_cloud_filtered_);
 }
