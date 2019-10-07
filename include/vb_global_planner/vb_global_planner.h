@@ -95,7 +95,9 @@ private:
     // function define
     Point CPoint(float x, float y);
     float Norm(Point p);
-    Point PrincipalAnalysis();
+    // Point PrincipalAnalysis();
+    void OpenDirectionAnalysis();
+    float RawCast(Point direction);
     void ElasticRawCast();
     void InitializeParam();
     void OdomHandler(const nav_msgs::Odometry odom_msg);
@@ -107,9 +109,13 @@ private:
     // valuable define
     nav_msgs::Odometry odom_;
     Point robot_heading_;
+    std::vector<Point> direct_stack_;
+    std::vector<float> direct_score_stack_;
+    std::vector<Point> collision_point_stack_;
     Point3D robot_pos_;
     ROSWayPoint goal_waypoint_;
-    Point principal_direction_;
+    // Point principal_direction_;
+    Point open_direction_;
     Point old_principla_direction_;
     Point second_direction_left_;
     Point second_direction_right_;
@@ -118,7 +124,8 @@ private:
     pcl::PointCloud<pcl::PointXYZI>::Ptr laser_cloud_filtered_;
     pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr kdtree_collision_cloud_;
     // ros  parameter value
-    int raw_cast_revolution_;
+    int raw_cast_resolution_;
+    float angle_resolution_;
     float max_sensor_range_;
     int obs_count_thred_;
     float collision_radius_;
