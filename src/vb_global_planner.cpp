@@ -21,7 +21,7 @@ VB_Planner::VB_Planner() {
         robot_frame_id_ = "X1/base_link";
     }
     if (!nh_.getParam("angle_resolution",angle_resolution_)) {
-        angle_resolution_ = M_PI / 18.0;
+        angle_resolution_ = 36;
     }
     // get topic name parameter
     if (!nh_.getParam("vb_goal_topic",goal_topic_)) {
@@ -101,6 +101,7 @@ void VB_Planner::OpenDirectionAnalysis() {
     int num_direct = direct_stack_.size();
     Point open_direct = robot_heading_;
     float high_score = 0;
+    direct_score_stack_.clear();
     direct_score_stack_.reserve(num_direct);
     for (int i=0; i<num_direct; i++) {
         direct_score_stack_[i] = this->RawCast(direct_stack_[i]);
@@ -173,9 +174,10 @@ bool VB_Planner::HitObstacle(Point p) {
 void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
     // Credit: CMU SUB_T dfs_behavior_planner, Chao C.,
     // https://bitbucket.org/cmusubt/dfs_behavior_planner/src/master/src/dfs_behavior_planner/dfs_behavior_planner.cpp
-    int num_direction;
+    float angle_step;
     Point heading_right;
     Point heading_left;
+    direct_stack_.clear();
     odom_ = odom_msg;
     rviz_direction_.header = odom_.header;
     robot_pos_.x = odom_.pose.pose.position.x;
@@ -185,13 +187,16 @@ void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
     double roll, pitch, yaw;
     geometry_msgs::Quaternion geo_quat = odom_msg.pose.pose.orientation;
     tf::Matrix3x3(tf::Quaternion(geo_quat.x, geo_quat.y, geo_quat.z, geo_quat.w)).getRPY(roll, pitch, yaw);
+    // std::cout<<"Debug Yaw: "<< yaw << std::endl;
     robot_heading_.x = cos(yaw);
     robot_heading_.y = sin(yaw);
+    // std::cout<<"Heading X: "<<  robot_heading_.x << "Heading Y: "<<  robot_heading_.y << std::endl;
     direct_stack_.push_back(robot_heading_);
-    num_direction = int(std::ceil (M_PI / angle_resolution_));
-    for (int i=1; i<num_direction%2; i++) {
-        heading_right = this->CPoint(cos(yaw+i*angle_resolution_),sin(yaw+i*angle_resolution_));
-        heading_left = this->CPoint(cos(yaw-i*angle_resolution_),sin(yaw-i*angle_resolution_));
+    angle_step = M_PI / float(angle_resolution_); 
+
+    for (int i=1; i<int(angle_resolution_/2); i++) {
+        heading_right = this->CPoint(cos(yaw+i*angle_step),sin(yaw+i*angle_step));
+        heading_left = this->CPoint(cos(yaw-i*angle_step),sin(yaw-i*angle_step));
         direct_stack_.push_back(heading_right);
         direct_stack_.push_back(heading_left);
     }

@@ -125,7 +125,7 @@ private:
     pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr kdtree_collision_cloud_;
     // ros  parameter value
     int raw_cast_resolution_;
-    float angle_resolution_;
+    int angle_resolution_;
     float max_sensor_range_;
     int obs_count_thred_;
     float collision_radius_;
