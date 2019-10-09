@@ -96,7 +96,7 @@ private:
     Point CPoint(float x, float y);
     float Norm(Point p);
     // Point PrincipalAnalysis();
-    void OpenDirectionAnalysis();
+    Point OpenDirectionAnalysis();
     float RawCast(Point direction);
     void ElasticRawCast();
     void InitializeParam();
@@ -116,7 +116,7 @@ private:
     ROSWayPoint goal_waypoint_;
     // Point principal_direction_;
     Point open_direction_;
-    Point old_principla_direction_;
+    Point old_open_direction_;
     Point second_direction_left_;
     Point second_direction_right_;
     nav_msgs::Path rviz_direction_;

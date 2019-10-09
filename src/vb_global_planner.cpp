@@ -39,7 +39,7 @@ VB_Planner::VB_Planner() {
     kdtree_collision_cloud_ = pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr(new pcl::KdTreeFLANN<pcl::PointXYZI>());
 
     // initial old principal direciton
-    old_principla_direction_ = this->CPoint(0,0);
+    old_open_direction_ = this->CPoint(0,0);
     std::cout<<"Initialize Successfully"<<std::endl;
 }
 
@@ -97,7 +97,7 @@ void VB_Planner::Loop() {
 //     return principal_direction_;
 // }
 
-void VB_Planner::OpenDirectionAnalysis() {
+Point VB_Planner::OpenDirectionAnalysis() {
     int num_direct = direct_stack_.size();
     Point open_direct = robot_heading_;
     float high_score = 0;
@@ -108,12 +108,13 @@ void VB_Planner::OpenDirectionAnalysis() {
     }
     for (int i=0; i<num_direct; i++) {
         float score = direct_score_stack_[i];
-        if (score > high_score) {
+        if (score > high_score && (old_open_direction_ == this->CPoint(0,0) || old_open_direction_ * direct_stack_[i] > 0.25)) {
             high_score = score;
             open_direct = direct_stack_[i];
         }
     }
     open_direction_ = open_direct;
+    return open_direct;
 }
 
 void VB_Planner::ElasticRawCast() {
@@ -231,7 +232,7 @@ void VB_Planner::CloudHandler(const sensor_msgs::PointCloud2ConstPtr laser_msg) 
     this->LaserCloudFilter();
     kdtree_collision_cloud_->setInputCloud(laser_cloud_filtered_);
     // old_principla_direction_ = this->PrincipalAnalysis(); // update 
-    this->OpenDirectionAnalysis();
+    old_open_direction_ = this->OpenDirectionAnalysis();
     this->ElasticRawCast(); // update waypoint 
     this->HandleWaypoint(); // Log frame id, etc. -> goal 
 
