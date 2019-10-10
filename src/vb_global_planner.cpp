@@ -12,7 +12,7 @@ VB_Planner::VB_Planner() {
         max_sensor_range_ = 15.0;
     }
     if (!nh_.getParam("obs_count_thred",obs_count_thred_)) {
-        obs_count_thred_ = 5;
+        obs_count_thred_ = 10;
     }
     if (!nh_.getParam("collision_radius",collision_radius_)) {
         collision_radius_ = 0.5;
@@ -21,7 +21,7 @@ VB_Planner::VB_Planner() {
         robot_frame_id_ = "X1/base_link";
     }
     if (!nh_.getParam("angle_resolution",angle_resolution_)) {
-        angle_resolution_ = 36;
+        angle_resolution_ = 60;
     }
     // get topic name parameter
     if (!nh_.getParam("vb_goal_topic",goal_topic_)) {
@@ -69,46 +69,36 @@ void VB_Planner::Loop() {
     //ros::spin();
 }
 
-// Point VB_Planner::PrincipalAnalysis() {
-//     //  Output: a 2D vector with the domain direction -- Normlize to Norm 1
-//     // Using PCA -> eigen vector with maximum eigen value
-//     Eigen::Matrix3f eigen_vectors;
-//     pcl::PCA<pcl::PointXYZI> cpca;
-//     cpca.setInputCloud(laser_cloud_);
-//     eigen_vectors = cpca.getEigenVectors();
-//     Eigen::Vector3f vector;
-
-//     vector(0) = eigen_vectors(0,0);
-//     vector(1) = eigen_vectors(0,1);
-//     vector(2) = eigen_vectors(0,2);
-//     float norm = sqrt(vector(0)*vector(0) + vector(1)*vector(1));
-//     principal_direction_.x = vector(0) / norm;
-//     principal_direction_.y = vector(1) / norm;
-//     if (old_principla_direction_ == this->CPoint(0,0) && principal_direction_ * robot_heading_ < 0) {
-//         principal_direction_.x *= -1;
-//         principal_direction_.y *= -1;
-//     }else if (principal_direction_ * old_principla_direction_ < 0) {
-//         principal_direction_.x *= -1;
-//         principal_direction_.y *= -1;
-//     }
-//     second_direction_left_ = this->CPoint(-principal_direction_.y,principal_direction_.x);
-//     second_direction_right_ = this->CPoint(principal_direction_.y,-principal_direction_.x);
-
-//     return principal_direction_;
-// }
-
 Point VB_Planner::OpenDirectionAnalysis() {
     int num_direct = direct_stack_.size();
     Point open_direct = robot_heading_;
+    std::vector<float> temp_score_stack;
     float high_score = 0;
     direct_score_stack_.clear();
     direct_score_stack_.reserve(num_direct);
+    temp_score_stack.reserve(num_direct);
     for (int i=0; i<num_direct; i++) {
-        direct_score_stack_[i] = this->RawCast(direct_stack_[i]);
+        temp_score_stack[i] = this->RawCast(direct_stack_[i]);
     }
+    // average filter
+    int filter_coeff = num_direct / 10;
+    for (int i=0; i<num_direct; i++) {
+        float score = 0;
+        int counter = 0;
+        for (int j=0; j<filter_coeff; j++) {
+            int s = 2;
+            if (i==0) s = 1; 
+            if (i+j*s < num_direct) {
+                score += temp_score_stack[i+j*s];
+                counter += 1;
+            }
+        }
+        direct_score_stack_[i] = score / float(counter);
+    }
+
     for (int i=0; i<num_direct; i++) {
         float score = direct_score_stack_[i];
-        if (score > high_score && (old_open_direction_ == this->CPoint(0,0) || old_open_direction_ * direct_stack_[i] > 0.25)) {
+        if (score > high_score && (old_open_direction_ == this->CPoint(0,0) || old_open_direction_ * direct_stack_[i] > 0.8)) {
             high_score = score;
             open_direct = direct_stack_[i];
         }
@@ -193,7 +183,7 @@ void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
     robot_heading_.y = sin(yaw);
     // std::cout<<"Heading X: "<<  robot_heading_.x << "Heading Y: "<<  robot_heading_.y << std::endl;
     direct_stack_.push_back(robot_heading_);
-    angle_step = M_PI / float(angle_resolution_); 
+    angle_step = M_PI * 1.2 / float(angle_resolution_); 
 
     for (int i=1; i<int(angle_resolution_/2); i++) {
         heading_right = this->CPoint(cos(yaw+i*angle_step),sin(yaw+i*angle_step));
