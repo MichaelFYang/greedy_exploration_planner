@@ -234,10 +234,7 @@ void VB_Planner::LaserCloudFilter() {
     for (std::size_t i=0; i<laser_cloud_size; i++) {
         point = laser_cloud_->points[i];
         misc_utils_ns::LeftRotatePoint(point);
-<<<<<<< HEAD:src/vb_global_planner.cpp
-=======
         // point.z = robot_pos_.z;
->>>>>>> master:src/vb_greedy_planner.cpp
         laser_cloud_temp->points.push_back(point);
     }
     laser_cloud_ = laser_cloud_temp;
