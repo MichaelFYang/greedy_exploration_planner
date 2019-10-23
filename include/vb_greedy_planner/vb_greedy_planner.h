@@ -1,3 +1,7 @@
+#ifndef VB_GREEDY_PLANNER_H
+#define VB_GREEDY_PLANNER_H
+
+
 #include <ros/ros.h>
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
@@ -134,3 +138,5 @@ private:
 
 
 };
+
+#endif

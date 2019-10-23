@@ -1,5 +1,4 @@
-
-#include "vb_global_planner/vb_global_planner.h"
+#include "vb_greedy_planner/vb_greedy_planner.h"
 
 /* ---------------------------------------------------------------------------- */
 
@@ -16,9 +15,6 @@ VB_Planner::VB_Planner() {
     }
     if (!nh_.getParam("collision_radius",collision_radius_)) {
         collision_radius_ = 0.5;
-    }
-    if (!nh_.getParam("robot_frame_id",robot_frame_id_)) {
-        robot_frame_id_ = "X1/base_link";
     }
     if (!nh_.getParam("angle_resolution",angle_resolution_)) {
         angle_resolution_ = 60;

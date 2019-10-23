@@ -1,0 +1,8 @@
+ray_cast_revolution : 100
+max_sensor_range: 15.0
+obs_count_thred: 10
+collision_radius: 0.5
+angle_resolution: 60
+vb_goal_topic: /way_point
+vb_laser_topic: /velodyne_cloud_registered
+vb_odom_topic: /integrated_to_map
