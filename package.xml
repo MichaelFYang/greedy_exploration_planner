@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>vb_global_planner</name>
+  <name>vb_greedy_planner</name>
   <version>0.0.0</version>
-  <description>The vb_global_planner package</description>
+  <description>The vb_greedy_planner package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->

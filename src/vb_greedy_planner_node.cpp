@@ -1,6 +1,6 @@
-// ROS Node of implement visibility_global_planner
+// ROS Node of implement visibility_greedy_planner
 
-#include "vb_global_planner/vb_global_planner.h"
+#include "vb_greedy_planner/vb_greedy_planner.h"
 
 
 /* ---------------------------------------------------------------------------- */

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(vb_global_planner)
+project(vb_greedy_planner)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -150,7 +150,7 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(${PROJECT_NAME}_node src/vb_global_planner_node.cpp src/vb_global_planner.cpp)
+add_executable(${PROJECT_NAME}_node src/vb_greedy_planner_node.cpp src/vb_greedy_planner.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
