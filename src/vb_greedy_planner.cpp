@@ -4,7 +4,7 @@
 
 VB_Planner::VB_Planner() {
     // ROS Parameter Read 
-    if (!nh_.getParam("ray_cast_revolution",raw_cast_resolution_)) {
+    if (!nh_.getParam("ray_cast_resolution",raw_cast_resolution_)) {
         raw_cast_resolution_ = 100;
     }
     if (!nh_.getParam("max_sensor_range",max_sensor_range_)) {
@@ -19,6 +19,12 @@ VB_Planner::VB_Planner() {
     if (!nh_.getParam("angle_resolution",angle_resolution_)) {
         angle_resolution_ = 60;
     }
+    if (!nh_.getParam("dead_end_filter"), dead_end_filter_) {
+        dead_end_filter_ = 10;
+    }
+    if (!nh_.getParam("dead_end_thred"), dead_end_thred_) {
+        dead_end_thred_ = 0.2;
+    }
     // get topic name parameter
     if (!nh_.getParam("vb_goal_topic",goal_topic_)) {
         goal_topic_ = "/way_point";
@@ -29,6 +35,7 @@ VB_Planner::VB_Planner() {
     if (!nh_.getParam("vb_odom_topic",odom_topic_)) {
         odom_topic_ = "/integrated_to_map";
     }
+   
     // initial cloud
     laser_cloud_ = pcl::PointCloud<pcl::PointXYZI>::Ptr(new pcl::PointCloud<pcl::PointXYZI>());
     laser_cloud_filtered_ = pcl::PointCloud<pcl::PointXYZI>::Ptr(new pcl::PointCloud<pcl::PointXYZI>());
@@ -37,6 +44,8 @@ VB_Planner::VB_Planner() {
     // initial old principal direciton
     old_open_direction_ = this->CPoint(0,0);
     std::cout<<"Initialize Successfully"<<std::endl;
+    max_score_stack_.clear();
+    dead_end_ = false;
 }
 
 Point VB_Planner::CPoint(float x, float y) {
@@ -57,12 +66,14 @@ void VB_Planner::Loop() {
     ros::Rate rate(1);
     while(ros::ok())
     {
-        ros::spinOnce();
+        ros::spinOnce(); // process all callback function
         //process
+        this->UpdateRawCastingStack();
+        old_open_direction_ = this->OpenDirectionAnalysis();
+        this->ElasticRawCast(); // update waypoint 
+        this->HandleWaypoint(); // Log frame id, etc. -> goal 
         rate.sleep();
     }
-
-    //ros::spin();
 }
 
 Point VB_Planner::OpenDirectionAnalysis() {
@@ -103,12 +114,35 @@ Point VB_Planner::OpenDirectionAnalysis() {
     return open_direct;
 }
 
+void VB_Planner::DeadEndAnalysis(double dist) {
+    // Wiil update dead_end_ flag
+    int num_dist = max_score_stack_.size();
+    double average = 0;
+    if (num_dist < dead_end_filter_) {
+        max_score_stack_.push_back(dist);
+        num_dist += 1;
+    }else {
+        max_score_stack_.erase(max_score_stack_.begin());
+        max_score_stack_.push_back(dist);
+    }
+    for (std::size_t i=0; i<num_dist; i++) {
+        average += max_score_stack_[i];
+    }
+    average /= num_dist;
+    if (average < dead_end_thred_) {
+        dead_end_ = true;
+        return;
+    }
+    dead_end_ = false;
+}
+
 void VB_Planner::ElasticRawCast() {
     // TODO -> Right now is the simple version of ray casting
     int counter = 0;
     Point center_pos = this->CPoint(robot_pos_.x, robot_pos_.y);
     Point check_pos_principal = center_pos;
     // principal direction
+    double dist = this->Norm(check_pos_principal - center_pos);
     while(counter < obs_count_thred_ && this->Norm(check_pos_principal - center_pos) < max_sensor_range_) {
         check_pos_principal.x += open_direction_.x / raw_cast_resolution_;
         check_pos_principal.y += open_direction_.y / raw_cast_resolution_;
@@ -116,7 +150,9 @@ void VB_Planner::ElasticRawCast() {
         if (this->HitObstacle(check_pos_principal)) {
             counter += 1;
         }
+        dist = this->Norm(check_pos_principal - center_pos);
     }
+    this->DeadEndAnalysis(dist); // update dead_end with limit time instances
     goal_waypoint_.point.x = check_pos_principal.x;
     goal_waypoint_.point.y = check_pos_principal.y;
     goal_waypoint_.point.z = robot_pos_.z;
@@ -161,6 +197,9 @@ bool VB_Planner::HitObstacle(Point p) {
 void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
     // Credit: CMU SUB_T dfs_behavior_planner, Chao C.,
     // https://bitbucket.org/cmusubt/dfs_behavior_planner/src/master/src/dfs_behavior_planner/dfs_behavior_planner.cpp
+    if (!(old_open_direction_ == this->CPoint(0,0))) {
+        return;
+    }
     float angle_step;
     Point heading_right;
     Point heading_left;
@@ -178,6 +217,15 @@ void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
     robot_heading_.x = cos(yaw);
     robot_heading_.y = sin(yaw);
     // std::cout<<"Heading X: "<<  robot_heading_.x << "Heading Y: "<<  robot_heading_.y << std::endl;
+    
+    old_open_direction_ = robot_heading_;
+}
+
+void VB_Planner::UpdateRawCastingStack() {
+    if (dead_end_) {
+        old_open_direction_ = this->CPoint(0,0) - old_open_direction_; // if dead end -> inverse driection
+    }
+    double yaw = atan2(old_open_direction_.y, old_open_direction_.x);
     direct_stack_.push_back(robot_heading_);
     angle_step = M_PI * 1.2 / float(angle_resolution_); 
 
@@ -217,11 +265,6 @@ void VB_Planner::CloudHandler(const sensor_msgs::PointCloud2ConstPtr laser_msg) 
     pcl::fromROSMsg(*laser_msg, *laser_cloud_);
     this->LaserCloudFilter();
     kdtree_collision_cloud_->setInputCloud(laser_cloud_filtered_);
-    // old_principla_direction_ = this->PrincipalAnalysis(); // update 
-    old_open_direction_ = this->OpenDirectionAnalysis();
-    this->ElasticRawCast(); // update waypoint 
-    this->HandleWaypoint(); // Log frame id, etc. -> goal 
-
 }
 
 void VB_Planner::LaserCloudFilter() {

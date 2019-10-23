@@ -18,6 +18,7 @@
 #include <pcl/common/pca.h>
 #include <Eigen/Dense>
 #include <vector>
+#include <queue>
 #include <string>
 #include <math.h>
 #include <algorithm>
@@ -110,8 +111,12 @@ private:
     bool HitObstacle(Point p);
     void LaserCloudFilter();
     void HandleWayPoint();
+    void DeadEndAnalysis();
+    void UpdateRawCastingStack();
     // valuable define
     nav_msgs::Odometry odom_;
+    bool dead_end_;
+    std::vector<double> max_score_stack_;
     Point robot_heading_;
     std::vector<Point> direct_stack_;
     std::vector<float> direct_score_stack_;
@@ -133,6 +138,8 @@ private:
     float max_sensor_range_;
     int obs_count_thred_;
     float collision_radius_;
+    int dead_end_filter_;
+    float dead_end_thred_;
     std::string robot_frame_id_;
     std::string goal_topic_, laser_topic_, odom_topic_;
 
