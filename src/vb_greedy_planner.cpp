@@ -68,6 +68,13 @@ void VB_Planner::Loop() {
     {
         ros::spinOnce(); // process all callback function
         //process
+        if (!laser_cloud_filtered_->empty()) {
+            this->UpdateRawCastingStack();
+            old_open_direction_ = this->OpenDirectionAnalysis();
+            this->ElasticRawCast(); // update waypoint 
+            this->HandleWaypoint(); // Log frame id, etc. -> goal 
+        
+        }
         rate.sleep();
     }
 }
@@ -260,10 +267,6 @@ void VB_Planner::CloudHandler(const sensor_msgs::PointCloud2ConstPtr laser_msg) 
     pcl::fromROSMsg(*laser_msg, *laser_cloud_);
     this->LaserCloudFilter();
     kdtree_collision_cloud_->setInputCloud(laser_cloud_filtered_);
-    this->UpdateRawCastingStack();
-    old_open_direction_ = this->OpenDirectionAnalysis();
-    this->ElasticRawCast(); // update waypoint 
-    this->HandleWaypoint(); // Log frame id, etc. -> goal 
 }
 
 void VB_Planner::LaserCloudFilter() {
