@@ -111,7 +111,7 @@ private:
     bool HitObstacle(Point p);
     void LaserCloudFilter();
     void HandleWayPoint();
-    void DeadEndAnalysis();
+    void DeadEndAnalysis(double dist);
     void UpdateRawCastingStack();
     // valuable define
     nav_msgs::Odometry odom_;

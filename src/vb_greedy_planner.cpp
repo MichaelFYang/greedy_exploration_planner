@@ -19,10 +19,10 @@ VB_Planner::VB_Planner() {
     if (!nh_.getParam("angle_resolution",angle_resolution_)) {
         angle_resolution_ = 60;
     }
-    if (!nh_.getParam("dead_end_filter"), dead_end_filter_) {
-        dead_end_filter_ = 10;
+    if (!nh_.getParam("dead_end_filter", dead_end_filter_)) {
+        dead_end_filter_ = 50;
     }
-    if (!nh_.getParam("dead_end_thred"), dead_end_thred_) {
+    if (!nh_.getParam("dead_end_thred", dead_end_thred_)) {
         dead_end_thred_ = 0.2;
     }
     // get topic name parameter
@@ -68,10 +68,6 @@ void VB_Planner::Loop() {
     {
         ros::spinOnce(); // process all callback function
         //process
-        this->UpdateRawCastingStack();
-        old_open_direction_ = this->OpenDirectionAnalysis();
-        this->ElasticRawCast(); // update waypoint 
-        this->HandleWaypoint(); // Log frame id, etc. -> goal 
         rate.sleep();
     }
 }
@@ -131,6 +127,7 @@ void VB_Planner::DeadEndAnalysis(double dist) {
     average /= num_dist;
     if (average < dead_end_thred_) {
         dead_end_ = true;
+        max_score_stack_.clear();
         return;
     }
     dead_end_ = false;
@@ -197,12 +194,7 @@ bool VB_Planner::HitObstacle(Point p) {
 void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
     // Credit: CMU SUB_T dfs_behavior_planner, Chao C.,
     // https://bitbucket.org/cmusubt/dfs_behavior_planner/src/master/src/dfs_behavior_planner/dfs_behavior_planner.cpp
-    if (!(old_open_direction_ == this->CPoint(0,0))) {
-        return;
-    }
-    float angle_step;
-    Point heading_right;
-    Point heading_left;
+
     direct_stack_.clear();
     odom_ = odom_msg;
     rviz_direction_.header = odom_.header;
@@ -217,16 +209,19 @@ void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
     robot_heading_.x = cos(yaw);
     robot_heading_.y = sin(yaw);
     // std::cout<<"Heading X: "<<  robot_heading_.x << "Heading Y: "<<  robot_heading_.y << std::endl;
-    
-    old_open_direction_ = robot_heading_;
+    if (old_open_direction_ == this->CPoint(0,0)) {
+        old_open_direction_ = robot_heading_;
+    }
 }
 
 void VB_Planner::UpdateRawCastingStack() {
+    Point heading_right, heading_left;
+    double angle_step;
     if (dead_end_) {
         old_open_direction_ = this->CPoint(0,0) - old_open_direction_; // if dead end -> inverse driection
     }
     double yaw = atan2(old_open_direction_.y, old_open_direction_.x);
-    direct_stack_.push_back(robot_heading_);
+    direct_stack_.push_back(old_open_direction_);
     angle_step = M_PI * 1.2 / float(angle_resolution_); 
 
     for (int i=1; i<int(angle_resolution_/2); i++) {
@@ -265,6 +260,10 @@ void VB_Planner::CloudHandler(const sensor_msgs::PointCloud2ConstPtr laser_msg) 
     pcl::fromROSMsg(*laser_msg, *laser_cloud_);
     this->LaserCloudFilter();
     kdtree_collision_cloud_->setInputCloud(laser_cloud_filtered_);
+    this->UpdateRawCastingStack();
+    old_open_direction_ = this->OpenDirectionAnalysis();
+    this->ElasticRawCast(); // update waypoint 
+    this->HandleWaypoint(); // Log frame id, etc. -> goal 
 }
 
 void VB_Planner::LaserCloudFilter() {
