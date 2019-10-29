@@ -41,6 +41,10 @@ VB_Planner::VB_Planner() {
     laser_cloud_filtered_ = pcl::PointCloud<pcl::PointXYZI>::Ptr(new pcl::PointCloud<pcl::PointXYZI>());
     kdtree_collision_cloud_ = pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr(new pcl::KdTreeFLANN<pcl::PointXYZI>());
 
+	frontier_cloud_ = pcl::PointCloud<pcl::PointXYZI>::Ptr(new pcl::PointCloud<pcl::PointXYZI>());
+    frontier_cloud_filtered_ = pcl::PointCloud<pcl::PointXYZI>::Ptr(new pcl::PointCloud<pcl::PointXYZI>());
+    kdtree_frontier_cloud_ = pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr(new pcl::KdTreeFLANN<pcl::PointXYZI>());
+
     // initial old principal direciton
     old_open_direction_ = this->CPoint(0,0);
     std::cout<<"Initialize Successfully"<<std::endl;
@@ -60,7 +64,7 @@ void VB_Planner::Loop() {
     rviz_direct_pub_ = nh_.advertise<nav_msgs::Path>("/vb_planner/PCA_direction",1);
     goal_pub_ = nh_.advertise<geometry_msgs::PointStamped>(goal_topic_,1);
     point_cloud_sub_ = nh_.subscribe(laser_topic_,1,&VB_Planner::CloudHandler,this);
-
+	frontier_cloud_sub_ = nh_.subscribe(frontier_topic_,1,&VB_Planner::FrontierCloudHandler,this);
     odom_sub_ = nh_.subscribe(odom_topic_,1,&VB_Planner::OdomHandler,this);
 
     ros::Rate rate(1);
@@ -68,7 +72,7 @@ void VB_Planner::Loop() {
     {
         ros::spinOnce(); // process all callback function
         //process
-        if (!laser_cloud_filtered_->empty()) {
+        if (!laser_cloud_filtered_->empty() && !frontier_cloud_filtered_->empty()) {
             this->UpdaterayCastingStack();
             old_open_direction_ = this->OpenDirectionAnalysis();
             this->ElasticrayCast(); // update waypoint 
@@ -82,11 +86,25 @@ void VB_Planner::Loop() {
 Point VB_Planner::OpenDirectionAnalysis() {
     int num_direct = direct_stack_.size();
     Point open_direct = robot_heading_;
-    std::vector<float> temp_score_stack;
     float high_score = 0;
-    direct_score_stack_.clear();
-    direct_score_stack_.reserve(num_direct);
-    temp_score_stack.reserve(num_direct);
+	this->VisibilityScoreAssign(direct_score_stack_)
+	// this->FrontierScoreAssign(direct_score_stack_)
+    for (int i=0; i<num_direct; i++) {
+        float score = direct_score_stack_[i];
+        if (score > high_score && (old_open_direction_ == this->CPoint(0,0) || old_open_direction_ * direct_stack_[i] > 0.8)) {
+            high_score = score;
+            open_direct = direct_stack_[i];
+        }
+    }
+    open_direction_ = open_direct;
+    return open_direct;
+}
+void VB_Planner::VisibilityScoreAssign(std::vector<float>& score_array) {
+	int num_direct = direct_stack_.size();
+	score_array.clear();
+	score_array.reserve(num_direct);
+    std::vector<float> temp_score_stack;
+	temp_score_stack.reserve(num_direct);
     for (int i=0; i<num_direct; i++) {
         temp_score_stack[i] = this->rayCast(direct_stack_[i]);
     }
@@ -103,18 +121,34 @@ Point VB_Planner::OpenDirectionAnalysis() {
                 counter += 1;
             }
         }
-        direct_score_stack_[i] = score / float(counter);
+        score_array[i] = score / float(counter);
     }
+}
 
+void VB_Planner::FrontierScoreAssign(std::vector<float>& score_array) {
+	int num_direct = direct_stack_.size();
+	score_array.clear();
+	score_array.reserve(num_direct);
+    std::vector<float> temp_score_stack;
+	temp_score_stack.reserve(num_direct);
     for (int i=0; i<num_direct; i++) {
-        float score = direct_score_stack_[i];
-        if (score > high_score && (old_open_direction_ == this->CPoint(0,0) || old_open_direction_ * direct_stack_[i] > 0.8)) {
-            high_score = score;
-            open_direct = direct_stack_[i];
-        }
+        temp_score_stack[i] = float(this->PointCounter(direct_stack_[i]));
     }
-    open_direction_ = open_direct;
-    return open_direct;
+    // average filter
+    int filter_coeff = num_direct / 10;
+    for (int i=0; i<num_direct; i++) {
+        float score = 0;
+        int counter = 0;
+        for (int j=0; j<filter_coeff; j++) {
+            int s = 2;
+            if (i==0) s = 1; 
+            if (i+j*s < num_direct) {
+                score += temp_score_stack[i+j*s];
+                counter += 1;
+            }
+        }
+        score_array[i] = score / float(counter);
+    }
 }
 
 void VB_Planner::DeadEndAnalysis(double dist) {
@@ -198,6 +232,10 @@ bool VB_Planner::HitObstacle(Point p) {
     return false;
 }
 
+int VB_Planner::PointCounter(Point direction) {
+	// TODO! Counte frontier point in direction
+}
+
 void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
     // Credit: CMU SUB_T dfs_behavior_planner, Chao C.,
     // https://bitbucket.org/cmusubt/dfs_behavior_planner/src/master/src/dfs_behavior_planner/dfs_behavior_planner.cpp
@@ -265,11 +303,19 @@ void VB_Planner::CloudHandler(const sensor_msgs::PointCloud2ConstPtr laser_msg) 
     // Take laser cloud -> update Principal Direction
     laser_cloud_->clear();
     pcl::fromROSMsg(*laser_msg, *laser_cloud_);
-    this->LaserCloudFilter();
+    this->LaserCloudFilter(laser_cloud_filtered_);
     kdtree_collision_cloud_->setInputCloud(laser_cloud_filtered_);
 }
 
-void VB_Planner::LaserCloudFilter() {
+void VB_Planner::FrontierCloudHandler(const sensor_msgs::PointCloud2ConstPtr frontier_msg) {
+    // Take laser cloud -> update Principal Direction
+    frontier_cloud_->clear();
+    pcl::fromROSMsg(*frontier_msg, *frontier_cloud_);
+    this->LaserCloudFilter(laser_frontier_filtered_);
+    kdtree_frontier_cloud_->setInputCloud(laser_frontier_filtered_);
+}
+
+void VB_Planner::LaserCloudFilter(pcl::PointCloud<pcl::PointXYZI>::Ptr& filtered_cloud) {
     // Source credit: http://pointclouds.org/documentation/tutorials/passthrough.php
     pcl::PassThrough<pcl::PointXYZI> cloud_filter;
     pcl::PointCloud<pcl::PointXYZI>::Ptr laser_cloud_temp(new pcl::PointCloud<pcl::PointXYZI>());
@@ -288,7 +334,7 @@ void VB_Planner::LaserCloudFilter() {
     cloud_filter.setFilterFieldName ("z");
     cloud_filter.setFilterLimits (robot_pos_.z-2*collision_radius_, robot_pos_.z+2*collision_radius_);
     //pass.setFilterLimitsNegative (true);
-    cloud_filter.filter(*laser_cloud_filtered_);
+    cloud_filter.filter(*filtered_cloud);
 }
 
 float VB_Planner::Norm(Point p) {

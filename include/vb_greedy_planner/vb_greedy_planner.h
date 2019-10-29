@@ -94,6 +94,7 @@ private:
     // rostopic define
     ros::NodeHandle nh_;
     ros::Subscriber point_cloud_sub_;
+	ros::Subscriber frontier_cloud_sub_;
     ros::Subscriber odom_sub_;
     ros::Publisher goal_pub_;
     ros::Publisher rviz_direct_pub_;
@@ -108,11 +109,15 @@ private:
     void OdomHandler(const nav_msgs::Odometry odom_msg);
     void HandleWaypoint();
     void CloudHandler(const sensor_msgs::PointCloud2ConstPtr cloud_msg);
+	void FrontierCloudHandler(const sensor_msgs::PointCloud2ConstPtr frointer_msg);
     bool HitObstacle(Point p);
+	int ObstacleCounter(Point direction);
     void LaserCloudFilter();
     void HandleWayPoint();
     void DeadEndAnalysis(double dist);
     void UpdaterayCastingStack();
+	void VisibilityScoreAssign(std::vector<float>& score_array)
+	void FrontierScoreAssign(std::vector<int>& score_array)
     // valuable define
     nav_msgs::Odometry odom_;
     bool dead_end_;
@@ -129,9 +134,12 @@ private:
     Point second_direction_left_;
     Point second_direction_right_;
     nav_msgs::Path rviz_direction_;
+	pcl::PointCloud<pcl::PointXYZI>::Ptr frontier_cloud_;
     pcl::PointCloud<pcl::PointXYZI>::Ptr laser_cloud_;
     pcl::PointCloud<pcl::PointXYZI>::Ptr laser_cloud_filtered_;
+	pcl::PointCloud<pcl::PointXYZI>::Ptr frontier_cloud_filtered_;
     pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr kdtree_collision_cloud_;
+	pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr kdtree_frontier_cloud_;
     // ros  parameter value
     int ray_cast_resolution_;
     int angle_resolution_;
