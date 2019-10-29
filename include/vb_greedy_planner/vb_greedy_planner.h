@@ -102,8 +102,8 @@ private:
     float Norm(Point p);
     // Point PrincipalAnalysis();
     Point OpenDirectionAnalysis();
-    float RawCast(Point direction);
-    void ElasticRawCast();
+    float rayCast(Point direction);
+    void ElasticrayCast();
     void InitializeParam();
     void OdomHandler(const nav_msgs::Odometry odom_msg);
     void HandleWaypoint();
@@ -112,7 +112,7 @@ private:
     void LaserCloudFilter();
     void HandleWayPoint();
     void DeadEndAnalysis(double dist);
-    void UpdateRawCastingStack();
+    void UpdaterayCastingStack();
     // valuable define
     nav_msgs::Odometry odom_;
     bool dead_end_;
@@ -133,7 +133,7 @@ private:
     pcl::PointCloud<pcl::PointXYZI>::Ptr laser_cloud_filtered_;
     pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr kdtree_collision_cloud_;
     // ros  parameter value
-    int raw_cast_resolution_;
+    int ray_cast_resolution_;
     int angle_resolution_;
     float max_sensor_range_;
     int obs_count_thred_;

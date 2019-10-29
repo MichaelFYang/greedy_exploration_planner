@@ -4,8 +4,8 @@
 
 VB_Planner::VB_Planner() {
     // ROS Parameter Read 
-    if (!nh_.getParam("ray_cast_resolution",raw_cast_resolution_)) {
-        raw_cast_resolution_ = 100;
+    if (!nh_.getParam("ray_cast_resolution",ray_cast_resolution_)) {
+        ray_cast_resolution_ = 100;
     }
     if (!nh_.getParam("max_sensor_range",max_sensor_range_)) {
         max_sensor_range_ = 15.0;
@@ -69,9 +69,9 @@ void VB_Planner::Loop() {
         ros::spinOnce(); // process all callback function
         //process
         if (!laser_cloud_filtered_->empty()) {
-            this->UpdateRawCastingStack();
+            this->UpdaterayCastingStack();
             old_open_direction_ = this->OpenDirectionAnalysis();
-            this->ElasticRawCast(); // update waypoint 
+            this->ElasticrayCast(); // update waypoint 
             this->HandleWaypoint(); // Log frame id, etc. -> goal 
         
         }
@@ -88,7 +88,7 @@ Point VB_Planner::OpenDirectionAnalysis() {
     direct_score_stack_.reserve(num_direct);
     temp_score_stack.reserve(num_direct);
     for (int i=0; i<num_direct; i++) {
-        temp_score_stack[i] = this->RawCast(direct_stack_[i]);
+        temp_score_stack[i] = this->rayCast(direct_stack_[i]);
     }
     // average filter
     int filter_coeff = num_direct / 10;
@@ -140,7 +140,7 @@ void VB_Planner::DeadEndAnalysis(double dist) {
     dead_end_ = false;
 }
 
-void VB_Planner::ElasticRawCast() {
+void VB_Planner::ElasticrayCast() {
     // TODO -> Right now is the simple version of ray casting
     int counter = 0;
     Point center_pos = this->CPoint(robot_pos_.x, robot_pos_.y);
@@ -148,8 +148,8 @@ void VB_Planner::ElasticRawCast() {
     // principal direction
     double dist = this->Norm(check_pos_principal - center_pos);
     while(counter < obs_count_thred_ && this->Norm(check_pos_principal - center_pos) < max_sensor_range_) {
-        check_pos_principal.x += open_direction_.x / raw_cast_resolution_;
-        check_pos_principal.y += open_direction_.y / raw_cast_resolution_;
+        check_pos_principal.x += open_direction_.x / ray_cast_resolution_;
+        check_pos_principal.y += open_direction_.y / ray_cast_resolution_;
 
         if (this->HitObstacle(check_pos_principal)) {
             counter += 1;
@@ -163,7 +163,7 @@ void VB_Planner::ElasticRawCast() {
 
 }
 
-float VB_Planner::RawCast(Point direction) {
+float VB_Planner::rayCast(Point direction) {
     // Input: PointCloud; and Principal direction vector
     // Output: update goal waypoint -- the travel distance to an obstacle
     int counter = 0;
@@ -173,8 +173,8 @@ float VB_Planner::RawCast(Point direction) {
     Point check_pos_principal = center_pos;
     // principal direction
     while(counter < obs_count_thred_ && this->Norm(check_pos_principal - center_pos) < max_sensor_range_) {
-        check_pos_principal.x += direction.x / raw_cast_resolution_;
-        check_pos_principal.y += direction.y / raw_cast_resolution_;
+        check_pos_principal.x += direction.x / ray_cast_resolution_;
+        check_pos_principal.y += direction.y / ray_cast_resolution_;
 
         if (this->HitObstacle(check_pos_principal)) {
             counter += 1;
@@ -221,7 +221,7 @@ void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
     }
 }
 
-void VB_Planner::UpdateRawCastingStack() {
+void VB_Planner::UpdaterayCastingStack() {
     Point heading_right, heading_left;
     double angle_step;
     if (dead_end_) {
