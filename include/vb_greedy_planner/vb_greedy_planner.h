@@ -106,6 +106,7 @@ private:
     // Point PrincipalAnalysis();
     Point OpenDirectionAnalysis();
     float rayCast(Point direction);
+    int PointCounter(Point direction);
     void ElasticRayCast();
     void InitializeParam();
     void OdomHandler(const nav_msgs::Odometry odom_msg);
@@ -119,7 +120,7 @@ private:
     void DeadEndAnalysis(double dist);
     void UpdaterayCastingStack();
 	void VisibilityScoreAssign(std::vector<float>& score_array);
-	void FrontierScoreAssign(std::vector<int>& score_array);
+	void FrontierScoreAssign(std::vector<float>& score_array);
     void UpdateFrontierDirectionArray(std::vector<double>& direction_array);
     // valuable define
     nav_msgs::Odometry odom_;

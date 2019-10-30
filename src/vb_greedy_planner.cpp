@@ -78,7 +78,7 @@ void VB_Planner::Loop() {
     {
         ros::spinOnce(); // process all callback function
         //process
-        if (!laser_cloud_filtered_->empty() && !frontier_cloud_filtered_->empty()) {
+        if (!laser_cloud_filtered_->empty() && !laser_cloud_filtered_->empty()) {
             this->UpdaterayCastingStack();
             old_open_direction_ = this->OpenDirectionAnalysis();
             this->ElasticRayCast(); // update waypoint 
