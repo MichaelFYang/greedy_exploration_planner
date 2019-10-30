@@ -38,6 +38,9 @@ VB_Planner::VB_Planner() {
     if (!nh_.getParam("vb_odom_topic",odom_topic_)) {
         odom_topic_ = "/integrated_to_map";
     }
+    if (!nh_.getParam("vb_frontier_topic",frontier_topic_)) {
+        frontier_topic_ = "/frontier_cloud";
+    }
    
     // initial cloud
     laser_cloud_ = pcl::PointCloud<pcl::PointXYZI>::Ptr(new pcl::PointCloud<pcl::PointXYZI>());
@@ -45,7 +48,7 @@ VB_Planner::VB_Planner() {
     kdtree_collision_cloud_ = pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr(new pcl::KdTreeFLANN<pcl::PointXYZI>());
 
 	frontier_cloud_ = pcl::PointCloud<pcl::PointXYZI>::Ptr(new pcl::PointCloud<pcl::PointXYZI>());
-    frontier_cloud_filtered_ = pcl::PointCloud<pcl::PointXYZI>::Ptr(new pcl::PointCloud<pcl::PointXYZI>());
+    laser_frontier_filtered_ = pcl::PointCloud<pcl::PointXYZI>::Ptr(new pcl::PointCloud<pcl::PointXYZI>());
     kdtree_frontier_cloud_ = pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr(new pcl::KdTreeFLANN<pcl::PointXYZI>());
 
     // initial old principal direciton

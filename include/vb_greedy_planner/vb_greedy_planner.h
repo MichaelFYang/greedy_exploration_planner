@@ -106,7 +106,7 @@ private:
     // Point PrincipalAnalysis();
     Point OpenDirectionAnalysis();
     float rayCast(Point direction);
-    void ElasticrayCast();
+    void ElasticRayCast();
     void InitializeParam();
     void OdomHandler(const nav_msgs::Odometry odom_msg);
     void HandleWaypoint();
@@ -114,12 +114,12 @@ private:
 	void FrontierCloudHandler(const sensor_msgs::PointCloud2ConstPtr frointer_msg);
     bool HitObstacle(Point p);
 	int ObstacleCounter(Point direction);
-    void LaserCloudFilter();
+    void LaserCloudFilter(pcl::PointCloud<pcl::PointXYZI>::Ptr& filtered_cloud);
     void HandleWayPoint();
     void DeadEndAnalysis(double dist);
     void UpdaterayCastingStack();
-	void VisibilityScoreAssign(std::vector<float>& score_array)
-	void FrontierScoreAssign(std::vector<int>& score_array)
+	void VisibilityScoreAssign(std::vector<float>& score_array);
+	void FrontierScoreAssign(std::vector<int>& score_array);
     void UpdateFrontierDirectionArray(std::vector<double>& direction_array);
     // valuable define
     nav_msgs::Odometry odom_;
@@ -142,13 +142,13 @@ private:
 	pcl::PointCloud<pcl::PointXYZI>::Ptr frontier_cloud_;
     pcl::PointCloud<pcl::PointXYZI>::Ptr laser_cloud_;
     pcl::PointCloud<pcl::PointXYZI>::Ptr laser_cloud_filtered_;
-	pcl::PointCloud<pcl::PointXYZI>::Ptr frontier_cloud_filtered_;
+	pcl::PointCloud<pcl::PointXYZI>::Ptr laser_frontier_filtered_;
     pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr kdtree_collision_cloud_;
 	pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr kdtree_frontier_cloud_;
     // ros  parameter value
     int ray_cast_resolution_;
     int angle_resolution_;
-    double direction_resolurtion_;
+    double direction_resolution_;
     float max_sensor_range_;
     int obs_count_thred_;
     float collision_radius_;
@@ -157,7 +157,7 @@ private:
     int planner_type_;
     
     std::string robot_frame_id_;
-    std::string goal_topic_, laser_topic_, odom_topic_;
+    std::string goal_topic_, laser_topic_, frontier_topic_, odom_topic_;
 
 
 };

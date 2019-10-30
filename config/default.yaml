@@ -6,5 +6,6 @@ dead_end_thred: 1
 collision_radius: 0.01
 angle_resolution: 60
 vb_goal_topic: /way_point
+vb_frontier_topic: /frontier_cloud
 vb_laser_topic: /velodyne_cloud_registered
 vb_odom_topic: /integrated_to_map
