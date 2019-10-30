@@ -118,13 +118,16 @@ private:
     void UpdaterayCastingStack();
 	void VisibilityScoreAssign(std::vector<float>& score_array)
 	void FrontierScoreAssign(std::vector<int>& score_array)
+    void UpdateFrontierDirectionArray(std::vector<double>& direction_array);
     // valuable define
     nav_msgs::Odometry odom_;
     bool dead_end_;
+    std::size_t frontier_size_;
     std::vector<double> max_score_stack_;
     Point robot_heading_;
     std::vector<Point> direct_stack_;
     std::vector<float> direct_score_stack_;
+    std::vector<double> frontier_direction_stack_;
     std::vector<Point> collision_point_stack_;
     Point3D robot_pos_;
     ROSWayPoint goal_waypoint_;
@@ -143,11 +146,13 @@ private:
     // ros  parameter value
     int ray_cast_resolution_;
     int angle_resolution_;
+    double direction_resolurtion_;
     float max_sensor_range_;
     int obs_count_thred_;
     float collision_radius_;
-    int dead_end_filter_;
+    int dead_end_filter_; // time step for waiting
     float dead_end_thred_;
+    
     std::string robot_frame_id_;
     std::string goal_topic_, laser_topic_, odom_topic_;
 

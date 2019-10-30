@@ -25,6 +25,9 @@ VB_Planner::VB_Planner() {
     if (!nh_.getParam("dead_end_thred", dead_end_thred_)) {
         dead_end_thred_ = 0.2;
     }
+    if (!nh_.getParam("direction_resolurtion", direction_resolurtion_)) {
+        direction_resolurtion_ = M_PI/36.0;
+    }
     // get topic name parameter
     if (!nh_.getParam("vb_goal_topic",goal_topic_)) {
         goal_topic_ = "/way_point";
@@ -234,7 +237,31 @@ bool VB_Planner::HitObstacle(Point p) {
 
 int VB_Planner::PointCounter(Point direction) {
 	// TODO! Counte frontier point in direction
+    double yaw_mid = atan2(direction.y, direction.x);
+    double yaw_upper = fmin(yaw_mid + direction_resolution_, M_PI_2);
+    double yaw_low = fmax(yaw_mid + direction_resolution_, - M_PI_2);
+    double yaw_cur;
+    int counter = 0;
+    for (std::size_t i=0; i<frontier_size_; i++) {
+        yaw_cur = frontier_direction_stack_[i];
+        if (yaw_cur>yaw_low && yaw_cur<yaw_upper) {
+            counter += 1;
+        }
+    }
+    return counter;
 }
+void VB_Planner::UpdateFrontierDirectionArray(std::vector<double>& direction_array) {
+    direction_array.clear();
+    frontier_size_ = laser_frontier_filtered_->points.size();
+    direction_array.resize(frontier_size_);
+    pcl::PointXYZI point;
+    for (std::size_t i=0; i<frontier_size_; i++) {
+        point = laser_frontier_filtered_->points[i];
+        double yaw = atan2(point.y, point.x);
+        direction_array[i] = yaw;
+    }
+}
+
 
 void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
     // Credit: CMU SUB_T dfs_behavior_planner, Chao C.,
