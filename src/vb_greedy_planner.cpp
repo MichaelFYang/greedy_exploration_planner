@@ -10,6 +10,9 @@ VB_Planner::VB_Planner() {
     if (!nh_.getParam("max_sensor_range",max_sensor_range_)) {
         max_sensor_range_ = 15.0;
     }
+    if (!nh_.getParam("planner_type",planner_type_)) {
+        planner_type_ = 0;
+    }
     if (!nh_.getParam("obs_count_thred",obs_count_thred_)) {
         obs_count_thred_ = 10;
     }
@@ -24,9 +27,6 @@ VB_Planner::VB_Planner() {
     }
     if (!nh_.getParam("dead_end_thred", dead_end_thred_)) {
         dead_end_thred_ = 0.2;
-    }
-    if (!nh_.getParam("direction_resolurtion", direction_resolurtion_)) {
-        direction_resolurtion_ = M_PI/36.0;
     }
     // get topic name parameter
     if (!nh_.getParam("vb_goal_topic",goal_topic_)) {
@@ -78,7 +78,7 @@ void VB_Planner::Loop() {
         if (!laser_cloud_filtered_->empty() && !frontier_cloud_filtered_->empty()) {
             this->UpdaterayCastingStack();
             old_open_direction_ = this->OpenDirectionAnalysis();
-            this->ElasticrayCast(); // update waypoint 
+            this->ElasticRayCast(); // update waypoint 
             this->HandleWaypoint(); // Log frame id, etc. -> goal 
         
         }
@@ -90,8 +90,17 @@ Point VB_Planner::OpenDirectionAnalysis() {
     int num_direct = direct_stack_.size();
     Point open_direct = robot_heading_;
     float high_score = 0;
-	this->VisibilityScoreAssign(direct_score_stack_)
-	// this->FrontierScoreAssign(direct_score_stack_)
+    switch (planner_type_)
+    {
+    case 0:
+        this->VisibilityScoreAssign(direct_score_stack_);
+        break;
+    case 1:
+        this->FrontierScoreAssign(direct_score_stack_);
+        break;
+    default:
+        this->VisibilityScoreAssign(direct_score_stack_);
+    }
     for (int i=0; i<num_direct; i++) {
         float score = direct_score_stack_[i];
         if (score > high_score && (old_open_direction_ == this->CPoint(0,0) || old_open_direction_ * direct_stack_[i] > 0.8)) {
@@ -177,7 +186,7 @@ void VB_Planner::DeadEndAnalysis(double dist) {
     dead_end_ = false;
 }
 
-void VB_Planner::ElasticrayCast() {
+void VB_Planner::ElasticRayCast() {
     // TODO -> Right now is the simple version of ray casting
     int counter = 0;
     Point center_pos = this->CPoint(robot_pos_.x, robot_pos_.y);
@@ -294,8 +303,19 @@ void VB_Planner::UpdaterayCastingStack() {
     }
     double yaw = atan2(old_open_direction_.y, old_open_direction_.x);
     direct_stack_.push_back(old_open_direction_);
-    angle_step = M_PI * 1.2 / float(angle_resolution_); 
-
+    switch (planner_type_)
+    {
+    case 0:
+        angle_step = M_PI * 1.2 / float(angle_resolution_);
+        break;
+    case 1:
+        angle_step = 2 * M_PI * 1.2 / float(angle_resolution_); // 360 degree sensing
+        break;
+    default:
+        angle_step = M_PI * 1.2 / float(angle_resolution_);
+        break;
+    }
+    direction_resolution_ = angle_step;
     for (int i=1; i<int(angle_resolution_/2); i++) {
         heading_right = this->CPoint(cos(yaw+i*angle_step),sin(yaw+i*angle_step));
         heading_left = this->CPoint(cos(yaw-i*angle_step),sin(yaw-i*angle_step));

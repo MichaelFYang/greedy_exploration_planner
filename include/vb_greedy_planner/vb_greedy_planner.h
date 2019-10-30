@@ -1,6 +1,8 @@
 #ifndef VB_GREEDY_PLANNER_H
 #define VB_GREEDY_PLANNER_H
 
+#define VISIBILITY 0
+#define FRONTIER 1
 
 #include <ros/ros.h>
 #include <nav_msgs/Odometry.h>
@@ -152,6 +154,7 @@ private:
     float collision_radius_;
     int dead_end_filter_; // time step for waiting
     float dead_end_thred_;
+    int planner_type_;
     
     std::string robot_frame_id_;
     std::string goal_topic_, laser_topic_, odom_topic_;
