@@ -78,7 +78,7 @@ void VB_Planner::Loop() {
     {
         ros::spinOnce(); // process all callback function
         //process
-        if (!laser_cloud_filtered_->empty() && !laser_cloud_filtered_->empty()) {
+        if (!laser_cloud_filtered_->empty() || !laser_frontier_filtered_->empty()) {
             this->UpdaterayCastingStack();
             old_open_direction_ = this->OpenDirectionAnalysis();
             this->ElasticRayCast(); // update waypoint 
@@ -327,6 +327,14 @@ void VB_Planner::UpdaterayCastingStack() {
     }
 }
 
+void VB_Planner::LeftRotatePoint(pcl::PointXYZI &pnt) {
+// Source:https://bitbucket.org/cmusubt/misc_utils/src/master/src/misc_utils.cpp
+    float tmp_z = pnt.z;
+    pnt.z = pnt.y;
+    pnt.y = pnt.x;
+    pnt.x = tmp_z;
+}
+
 void VB_Planner::HandleWaypoint() {
     // publish rviz
     geometry_msgs::PoseStamped pose;
@@ -374,7 +382,7 @@ void VB_Planner::LaserCloudFilter(pcl::PointCloud<pcl::PointXYZI>::Ptr& filtered
     pcl::PointXYZI point;
     for (std::size_t i=0; i<laser_cloud_size; i++) {
         point = laser_cloud_->points[i];
-        misc_utils_ns::LeftRotatePoint(point);
+        this->LeftRotatePoint(point);
         // point.z = robot_pos_.z;
         laser_cloud_temp->points.push_back(point);
     }

@@ -16,7 +16,6 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/filters/passthrough.h>
-#include <misc_utils/misc_utils.h>
 #include <pcl/common/pca.h>
 #include <Eigen/Dense>
 #include <vector>
@@ -122,6 +121,7 @@ private:
 	void VisibilityScoreAssign(std::vector<float>& score_array);
 	void FrontierScoreAssign(std::vector<float>& score_array);
     void UpdateFrontierDirectionArray(std::vector<double>& direction_array);
+    void LeftRotatePoint(pcl::PointXYZI &pnt);
     // valuable define
     nav_msgs::Odometry odom_;
     bool dead_end_;
