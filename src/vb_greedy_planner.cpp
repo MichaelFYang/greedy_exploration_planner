@@ -52,16 +52,17 @@ VB_Planner::VB_Planner() {
     kdtree_frontier_cloud_ = pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr(new pcl::KdTreeFLANN<pcl::PointXYZI>());
 
     // initial old principal direciton
-    old_open_direction_ = this->CPoint(0,0);
+    old_open_direction_ = Point3D(0,0,0);
     std::cout<<"Initialize Successfully"<<std::endl;
     max_score_stack_.clear();
     dead_end_ = false;
 }
 
-Point VB_Planner::CPoint(float x, float y) {
-    Point p;
+Point3D VB_Planner::CPoint(float x, float y, float z) {
+    Point3D p;
     p.x = x;
     p.y = y;
+    p.z = z;
     return p;
 }
 
@@ -89,9 +90,9 @@ void VB_Planner::Loop() {
     }
 }
 
-Point VB_Planner::OpenDirectionAnalysis() {
+Point3D VB_Planner::OpenDirectionAnalysis() {
     int num_direct = direct_stack_.size();
-    Point open_direct = robot_heading_;
+    Point3D open_direct = robot_heading_;
     float high_score = 0;
     switch (planner_type_)
     {
@@ -106,7 +107,7 @@ Point VB_Planner::OpenDirectionAnalysis() {
     }
     for (int i=0; i<num_direct; i++) {
         float score = direct_score_stack_[i];
-        if (score > high_score && (old_open_direction_ == this->CPoint(0,0) || old_open_direction_ * direct_stack_[i] > 0.8)) {
+        if (score > high_score && (old_open_direction_ == Point3D(0,0,0) || old_open_direction_ * direct_stack_[i] > 0.8)) {
             high_score = score;
             open_direct = direct_stack_[i];
         }
@@ -115,7 +116,8 @@ Point VB_Planner::OpenDirectionAnalysis() {
     return open_direct;
 }
 void VB_Planner::VisibilityScoreAssign(std::vector<float>& score_array) {
-	int num_direct = direct_stack_.size();
+	int num_surface = direct_stack_3D_.size();
+    int num_direct = direct_stack_3D_[0].size();
 	score_array.clear();
 	score_array.reserve(num_direct);
     std::vector<float> temp_score_stack;
@@ -192,8 +194,8 @@ void VB_Planner::DeadEndAnalysis(double dist) {
 void VB_Planner::ElasticRayCast() {
     // TODO -> Right now is the simple version of ray casting
     int counter = 0;
-    Point center_pos = this->CPoint(robot_pos_.x, robot_pos_.y);
-    Point check_pos_principal = center_pos;
+    Point3D center_pos = this->CPoint(robot_pos_.x, robot_pos_.y);
+    Point3D check_pos_principal = center_pos;
     // principal direction
     double dist = this->Norm(check_pos_principal - center_pos);
     while(counter < obs_count_thred_ && this->Norm(check_pos_principal - center_pos) < max_sensor_range_) {
@@ -212,14 +214,14 @@ void VB_Planner::ElasticRayCast() {
 
 }
 
-float VB_Planner::rayCast(Point direction) {
+float VB_Planner::rayCast(Point3D direction) {
     // Input: PointCloud; and Principal direction vector
     // Output: update goal waypoint -- the travel distance to an obstacle
     int counter = 0;
     float center_x = robot_pos_.x;
     float center_y = robot_pos_.y;
-    Point center_pos = this->CPoint(center_x, center_y);
-    Point check_pos_principal = center_pos;
+    Point3D center_pos = this->CPoint(center_x, center_y);
+    Point3D check_pos_principal = center_pos;
     // principal direction
     while(counter < obs_count_thred_ && this->Norm(check_pos_principal - center_pos) < max_sensor_range_) {
         check_pos_principal.x += direction.x / ray_cast_resolution_;
@@ -232,7 +234,7 @@ float VB_Planner::rayCast(Point direction) {
     return this->Norm(check_pos_principal - center_pos);
 }
 
-bool VB_Planner::HitObstacle(Point p) {
+bool VB_Planner::HitObstacle(Point3D p) {
     // Credit: Chao C.,
     std::vector<int> pointSearchInd;
     std::vector<float> pointSearchSqDis;
@@ -247,7 +249,7 @@ bool VB_Planner::HitObstacle(Point p) {
     return false;
 }
 
-int VB_Planner::PointCounter(Point direction) {
+int VB_Planner::PointCounter(Point3D direction) {
 	// TODO! Counte frontier point in direction
     double yaw_mid = atan2(direction.y, direction.x);
     double yaw_upper = fmin(yaw_mid + direction_resolution_, M_PI_2);
@@ -279,7 +281,7 @@ void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
     // Credit: CMU SUB_T dfs_behavior_planner, Chao C.,
     // https://bitbucket.org/cmusubt/dfs_behavior_planner/src/master/src/dfs_behavior_planner/dfs_behavior_planner.cpp
 
-    direct_stack_.clear();
+    direct_stack_3D_.clear();
     odom_ = odom_msg;
     rviz_direction_.header = odom_.header;
     robot_pos_.x = odom_.pose.pose.position.x;
@@ -298,32 +300,59 @@ void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
     }
 }
 
-void VB_Planner::UpdaterayCastingStack() {
-    Point heading_right, heading_left;
+void VB_Planner::UpdateRayCastingStack() {
+    Point3D heading_right, heading_left;
+    std::vector<Point3D> direct_stack;
     double angle_step;
     if (dead_end_) {
-        old_open_direction_ = this->CPoint(0,0) - old_open_direction_; // if dead end -> inverse driection
+        old_open_direction_ = Point3D(0,0,0) - old_open_direction_; // if dead end -> inverse driection
     }
     double yaw = atan2(old_open_direction_.y, old_open_direction_.x);
-    direct_stack_.push_back(old_open_direction_);
+    double roll = atan2(old_open_direction_.z, this->Norm(Point3D(old_open_direction_.x, old_open_direction_.y, 0)));
     switch (planner_type_)
     {
     case 0:
         angle_step = M_PI * 1.2 / float(angle_resolution_);
         break;
     case 1:
-        angle_step = 2 * M_PI * 1.2 / float(angle_resolution_); // 360 degree sensing
+        angle_step = 2 * M_PI / float(angle_resolution_); // 360 degree sensing
         break;
     default:
         angle_step = M_PI * 1.2 / float(angle_resolution_);
         break;
     }
     direction_resolution_ = angle_step;
+    direct_stack.clear();
+    direct_stack.push_back(old_open_direction_);
     for (int i=1; i<int(angle_resolution_/2); i++) {
-        heading_right = this->CPoint(cos(yaw+i*angle_step),sin(yaw+i*angle_step));
-        heading_left = this->CPoint(cos(yaw-i*angle_step),sin(yaw-i*angle_step));
-        direct_stack_.push_back(heading_right);
-        direct_stack_.push_back(heading_left);
+        heading_right = Point3D(cos(yaw+i*angle_step)*cos(roll),sin(yaw+i*angle_step)*cos(roll), sin(roll));
+        heading_left = Point3D(cos(yaw-i*angle_step)*cos(roll),sin(yaw-i*angle_step)*cos(roll),sin(roll));
+        direct_stack.push_back(heading_right);
+        direct_stack.push_back(heading_left);
+    }
+    direct_stack_3D_.push_back(direct_stack);
+    double roll_up, roll_down;
+    for (int k=1; k<BEANS; i++) {
+        roll_up = roll+k*ANG_RES_Y/180*M_PI;
+        roll_down = roll-k*ANG_RES_Y/180*M_PI;
+        direct_stack.clear();
+        direct_stack.push_back(Point3D(old_open_direction_.x,old_open_direction_.y,sin(roll_up)));
+        for (int i=1; i<int(angle_resolution_/2); i++) {
+            heading_right = Point3D(cos(yaw+i*angle_step)*cos(roll_up),sin(yaw+i*angle_step)*cos(roll_up), sin(roll_up));
+            heading_left = Point3D(cos(yaw-i*angle_step)*cos(roll_up),sin(yaw-i*angle_step)*cos(roll_up),sin(roll_up));
+            direct_stack.push_back(heading_right);
+            direct_stack.push_back(heading_left);
+        }
+        direct_stack_3D_.push_back(direct_stack);
+        direct_stack.clear();
+        direct_stack.push_back(Point3D(old_open_direction_.x,old_open_direction_.y,sin(roll_down)));
+        for (int i=1; i<int(angle_resolution_/2); i++) {
+            heading_right = Point3D(cos(yaw+i*angle_step)*cos(roll_down),sin(yaw+i*angle_step)*cos(roll_down), sin(roll_down));
+            heading_left = Point3D(cos(yaw-i*angle_step)*cos(roll_down),sin(yaw-i*angle_step)*cos(roll_down),sin(roll_down));
+            direct_stack.push_back(heading_right);
+            direct_stack.push_back(heading_left);
+        }
+        direct_stack_3D_.push_back(direct_stack);
     }
 }
 
@@ -346,9 +375,7 @@ void VB_Planner::HandleWaypoint() {
     rviz_direction_.poses.push_back(pose);
     pose.pose.position.x = robot_pos_.x + max_sensor_range_ * open_direction_.x;
     pose.pose.position.y = robot_pos_.y + max_sensor_range_ * open_direction_.y;
-    // pose.pose.position.x = goal_waypoint_.point.x;
-    // pose.pose.position.y = goal_waypoint_.point.y;
-    pose.pose.position.z = robot_pos_.z;
+    pose.pose.position.z = robot_pos_.z + max_sensor_range_ * open_direction_.z;
     rviz_direction_.poses.push_back(pose);
     // publish waypoint;
     goal_waypoint_.header = odom_.header;
@@ -362,42 +389,35 @@ void VB_Planner::CloudHandler(const sensor_msgs::PointCloud2ConstPtr laser_msg) 
     // Take laser cloud -> update Principal Direction
     laser_cloud_->clear();
     pcl::fromROSMsg(*laser_msg, *laser_cloud_);
-    this->LaserCloudFilter(laser_cloud_filtered_);
-    kdtree_collision_cloud_->setInputCloud(laser_cloud_filtered_);
+    this->LaserCloudFilter(laser_cloud_);
+    kdtree_collision_cloud_->setInputCloud(laser_cloud_);
 }
 
 void VB_Planner::FrontierCloudHandler(const sensor_msgs::PointCloud2ConstPtr frontier_msg) {
     // Take laser cloud -> update Principal Direction
     frontier_cloud_->clear();
     pcl::fromROSMsg(*frontier_msg, *frontier_cloud_);
-    this->LaserCloudFilter(laser_frontier_filtered_);
-    kdtree_frontier_cloud_->setInputCloud(laser_frontier_filtered_);
+    this->LaserCloudFilter(frontier_cloud_);
+    kdtree_frontier_cloud_->setInputCloud(frontier_cloud_);
 }
 
-void VB_Planner::LaserCloudFilter(pcl::PointCloud<pcl::PointXYZI>::Ptr& filtered_cloud) {
+void VB_Planner::LaserCloudFilter(pcl::PointCloud<pcl::PointXYZI>::Ptr& input_cloud) {
     // Source credit: http://pointclouds.org/documentation/tutorials/passthrough.php
-    pcl::PassThrough<pcl::PointXYZI> cloud_filter;
     pcl::PointCloud<pcl::PointXYZI>::Ptr laser_cloud_temp(new pcl::PointCloud<pcl::PointXYZI>());
     laser_cloud_temp->clear();
-    std::size_t laser_cloud_size = laser_cloud_->points.size();
+    std::size_t laser_cloud_size = input_cloud->points.size();
     pcl::PointXYZI point;
     for (std::size_t i=0; i<laser_cloud_size; i++) {
-        point = laser_cloud_->points[i];
+        point = input_cloud->points[i];
         this->LeftRotatePoint(point);
         // point.z = robot_pos_.z;
         laser_cloud_temp->points.push_back(point);
     }
-    laser_cloud_ = laser_cloud_temp;
-
-    cloud_filter.setInputCloud (laser_cloud_);
-    cloud_filter.setFilterFieldName ("z");
-    cloud_filter.setFilterLimits (robot_pos_.z-2*collision_radius_, robot_pos_.z+2*collision_radius_);
-    //pass.setFilterLimitsNegative (true);
-    cloud_filter.filter(*filtered_cloud);
+    input_cloud = laser_cloud_temp;
 }
 
-float VB_Planner::Norm(Point p) {
-    return sqrt(p.x*p.x + p.y*p.y);
+float VB_Planner::Norm(Point3D p) {
+    return sqrt(p.x*p.x + p.y*p.y + p.z*p.z);
 }
 
 /* ---------------------------------------------------------------------------- */

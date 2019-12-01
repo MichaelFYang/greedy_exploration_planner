@@ -3,6 +3,8 @@
 
 #define VISIBILITY 0
 #define FRONTIER 1
+#define ANG_RES_Y 2.0
+#define BEANS 7
 
 #include <ros/ros.h>
 #include <nav_msgs/Odometry.h>
@@ -12,7 +14,6 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
 #include <geometry_msgs/PointStamped.h>
-#include <geometry_msgs/Point.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/filters/passthrough.h>
@@ -24,63 +25,42 @@
 #include <math.h>
 #include <algorithm>
 
-typedef geometry_msgs::Point ROSPoint;
 typedef geometry_msgs::PoseStamped ROSWayPoint; 
 
-struct Point {
-    float x;
-    float y;
-    bool operator ==(const Point& pt) const
-    {
-        return x == pt.x && y == pt.y;
-    }
-
-    float operator *(const Point& pt) const
-    {
-        return x * pt.x + y * pt.y;
-    }
-
-    Point operator +(const Point& pt) const
-    {
-        Point p;
-        p.x = x + pt.x;
-        p.y = y + pt.y;
-
-        return p;
-    }
-    Point operator -(const Point& pt) const
-    {
-        Point p;
-        p.x = x - pt.x;
-        p.y = y - pt.y;
-        
-        return p;
-    }
-};
 
 struct Point3D {
     float x;
     float y;
     float z;
+    Point3D() {}
+    Point3D(float _x, float _y, float _z): x(_x), y(_y), z(_z) {}
+    bool operator ==(const Point3D& pt) const
+    {
+        return x == pt.x && y == pt.y && z == pt.z;
+    }
+
     float operator *(const Point3D& pt) const
     {
         return x * pt.x + y * pt.y + z * pt.z;
     }
+
+    Point3D operator *(const float factor) const
+    {
+        return Point3D(x*factor, y*factor, z*factor);
+    }
+
+    Point3D operator /(const float factor) const
+    {
+        return Point3D(x/factor, y/factor, z/factor);
+    }
+
     Point3D operator +(const Point3D& pt) const
     {
-        Point3D result;
-        result.x += pt.x;
-        result.y += pt.y;
-        result.z += pt.z;
-        return result;
+        return Point3D(x+pt.x, y+pt.y, z+pt.z);
     }
     Point3D operator -(const Point3D& pt) const
     {
-        Point3D result;
-        result.x -= pt.x;
-        result.y -= pt.y;
-        result.z -= pt.z;
-        return result;
+        return Point3D(x-pt.x, y-pt.y, z-pt.z);
     }
 };
 
@@ -100,24 +80,24 @@ private:
     ros::Publisher goal_pub_;
     ros::Publisher rviz_direct_pub_;
     // function define
-    Point CPoint(float x, float y);
-    float Norm(Point p);
-    // Point PrincipalAnalysis();
-    Point OpenDirectionAnalysis();
-    float rayCast(Point direction);
-    int PointCounter(Point direction);
+    Point3D CPoint(float x, float y, float z);
+    float Norm(Point3D p);
+    // Point3D PrincipalAnalysis();
+    Point3D OpenDirectionAnalysis();
+    float rayCast(Point3D direction);
+    int PointCounter(Point3D direction);
     void ElasticRayCast();
     void InitializeParam();
     void OdomHandler(const nav_msgs::Odometry odom_msg);
     void HandleWaypoint();
     void CloudHandler(const sensor_msgs::PointCloud2ConstPtr cloud_msg);
 	void FrontierCloudHandler(const sensor_msgs::PointCloud2ConstPtr frointer_msg);
-    bool HitObstacle(Point p);
-	int ObstacleCounter(Point direction);
+    bool HitObstacle(Point3D p);
+	int ObstacleCounter(Point3D direction);
     void LaserCloudFilter(pcl::PointCloud<pcl::PointXYZI>::Ptr& filtered_cloud);
     void HandleWayPoint();
     void DeadEndAnalysis(double dist);
-    void UpdaterayCastingStack();
+    void UpdateRayCastingStack();
 	void VisibilityScoreAssign(std::vector<float>& score_array);
 	void FrontierScoreAssign(std::vector<float>& score_array);
     void UpdateFrontierDirectionArray(std::vector<double>& direction_array);
@@ -127,18 +107,18 @@ private:
     bool dead_end_;
     std::size_t frontier_size_;
     std::vector<double> max_score_stack_;
-    Point robot_heading_;
-    std::vector<Point> direct_stack_;
+    Point3D robot_heading_;
+    std::vector<std::vector<Point3D> > direct_stack_3D_;
     std::vector<float> direct_score_stack_;
     std::vector<double> frontier_direction_stack_;
-    std::vector<Point> collision_point_stack_;
+    std::vector<Point3D> collision_point_stack_;
     Point3D robot_pos_;
     ROSWayPoint goal_waypoint_;
-    // Point principal_direction_;
-    Point open_direction_;
-    Point old_open_direction_;
-    Point second_direction_left_;
-    Point second_direction_right_;
+    // Point3D principal_direction_;
+    Point3D open_direction_;
+    Point3D old_open_direction_;
+    Point3D second_direction_left_;
+    Point3D second_direction_right_;
     nav_msgs::Path rviz_direction_;
 	pcl::PointCloud<pcl::PointXYZI>::Ptr frontier_cloud_;
     pcl::PointCloud<pcl::PointXYZI>::Ptr laser_cloud_;
