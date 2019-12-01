@@ -29,8 +29,8 @@ VB_Planner::VB_Planner() {
         dead_end_thred_ = 0.2;
     }
     // get topic name parameter
-    if (!nh_.getParam("vb_goal_topic",goal_topic_)) {
-        goal_topic_ = "/way_point";
+    if (!nh_.getParam("vb_goal_topic", goal_topic_)) {
+        goal_topic_ = "/uav1/custom_waypoint";
     }
     if (!nh_.getParam("vb_laser_topic",laser_topic_)) {
         laser_topic_ = "/velodyne_cloud_registered";
@@ -68,7 +68,7 @@ Point VB_Planner::CPoint(float x, float y) {
 void VB_Planner::Loop() {
     // Loop Subscriber
     rviz_direct_pub_ = nh_.advertise<nav_msgs::Path>("/vb_planner/PCA_direction",1);
-    goal_pub_ = nh_.advertise<geometry_msgs::PointStamped>(goal_topic_,1);
+    goal_pub_ = nh_.advertise<ROSWayPoint>(goal_topic_,1);
     point_cloud_sub_ = nh_.subscribe(laser_topic_,1,&VB_Planner::CloudHandler,this);
 	frontier_cloud_sub_ = nh_.subscribe(frontier_topic_,1,&VB_Planner::FrontierCloudHandler,this);
     odom_sub_ = nh_.subscribe(odom_topic_,1,&VB_Planner::OdomHandler,this);
@@ -206,9 +206,9 @@ void VB_Planner::ElasticRayCast() {
         dist = this->Norm(check_pos_principal - center_pos);
     }
     this->DeadEndAnalysis(dist); // update dead_end with limit time instances
-    goal_waypoint_.point.x = check_pos_principal.x;
-    goal_waypoint_.point.y = check_pos_principal.y;
-    goal_waypoint_.point.z = robot_pos_.z;
+    goal_waypoint_.pose.position.x = check_pos_principal.x;
+    goal_waypoint_.pose.position.y = check_pos_principal.y;
+    goal_waypoint_.pose.position.z = robot_pos_.z;
 
 }
 
@@ -352,6 +352,7 @@ void VB_Planner::HandleWaypoint() {
     rviz_direction_.poses.push_back(pose);
     // publish waypoint;
     goal_waypoint_.header = odom_.header;
+    goal_waypoint_.header.frame_id = "world";
     goal_pub_.publish(goal_waypoint_);
     rviz_direct_pub_.publish(rviz_direction_);
     // std::cout << "Goal Publihsed ..." << std::endl;

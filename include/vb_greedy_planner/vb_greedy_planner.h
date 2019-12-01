@@ -25,7 +25,7 @@
 #include <algorithm>
 
 typedef geometry_msgs::Point ROSPoint;
-typedef geometry_msgs::PointStamped ROSWayPoint; 
+typedef geometry_msgs::PoseStamped ROSWayPoint; 
 
 struct Point {
     float x;
