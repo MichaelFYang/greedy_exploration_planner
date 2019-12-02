@@ -98,8 +98,8 @@ private:
     void HandleWayPoint();
     void DeadEndAnalysis(double dist);
     void UpdateRayCastingStack();
-	void VisibilityScoreAssign(std::vector<float>& score_array);
-	void FrontierScoreAssign(std::vector<float>& score_array);
+	void VisibilityScoreAssign(std::vector<std::vector<float> >& score_array);
+	void FrontierScoreAssign(std::vector<std::vector<float> >& score_array);
     void UpdateFrontierDirectionArray(std::vector<double>& direction_array);
     void LeftRotatePoint(pcl::PointXYZI &pnt);
     // valuable define
@@ -109,7 +109,7 @@ private:
     std::vector<double> max_score_stack_;
     Point3D robot_heading_;
     std::vector<std::vector<Point3D> > direct_stack_3D_;
-    std::vector<float> direct_score_stack_;
+    std::vector<std::vector<float> > direct_score_stack_;
     std::vector<double> frontier_direction_stack_;
     std::vector<Point3D> collision_point_stack_;
     Point3D robot_pos_;
