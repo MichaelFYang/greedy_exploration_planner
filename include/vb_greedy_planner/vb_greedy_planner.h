@@ -3,8 +3,8 @@
 
 #define VISIBILITY 0
 #define FRONTIER 1
-#define ANG_RES_Y 2.0
-#define BEANS 7
+#define ANG_RES_Y 1.0
+#define BEANS 8
 
 #include <ros/ros.h>
 #include <nav_msgs/Odometry.h>

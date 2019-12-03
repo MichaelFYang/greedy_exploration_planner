@@ -23,10 +23,10 @@ VB_Planner::VB_Planner() {
         angle_resolution_ = 60;
     }
     if (!nh_.getParam("dead_end_filter", dead_end_filter_)) {
-        dead_end_filter_ = 50;
+        dead_end_filter_ = 5;
     }
     if (!nh_.getParam("dead_end_thred", dead_end_thred_)) {
-        dead_end_thred_ = 0.2;
+        dead_end_thred_ = 5.0;
     }
     // get topic name parameter
     if (!nh_.getParam("vb_goal_topic", goal_topic_)) {
@@ -79,7 +79,7 @@ void VB_Planner::Loop() {
     {
         ros::spinOnce(); // process all callback function
         //process
-        if (!laser_cloud_filtered_->empty() || !laser_frontier_filtered_->empty()) {
+        if (!laser_cloud_->empty() || !frontier_cloud_->empty()) {
             this->UpdateRayCastingStack();
             old_open_direction_ = this->OpenDirectionAnalysis();
             this->ElasticRayCast(); // update waypoint 
@@ -109,7 +109,7 @@ Point3D VB_Planner::OpenDirectionAnalysis() {
     for (int k=0; k<num_surface; k++) {
         for (int i=0; i<num_direct; i++) {
             float score = direct_score_stack_[k][i];
-            if (score > high_score && (old_open_direction_ == Point3D(0,0,0) || old_open_direction_ * direct_stack_3D_[k][i] > 0.8)) {
+            if (score > high_score && (old_open_direction_ == Point3D(0,0,0) || old_open_direction_ * direct_stack_3D_[k][i] > 0.85)) {
                 high_score = score;
                 open_direct = direct_stack_3D_[k][i];
             }
@@ -122,12 +122,12 @@ void VB_Planner::VisibilityScoreAssign(std::vector<std::vector<float> >& score_a
 	int num_surface = direct_stack_3D_.size();
     int num_direct = direct_stack_3D_[0].size();
 	score_array.clear();
-	score_array.reserve(num_surface);
+	score_array.resize(num_surface);
     std::vector<std::vector<float> > temp_score_stack;
-	temp_score_stack.reserve(num_surface);
+	temp_score_stack.resize(num_surface);
     for (int i=0; i<num_surface; i++) {
-        temp_score_stack[i].reserve(num_direct);
-        score_array[i].reserve(num_direct);
+        temp_score_stack[i].resize(num_direct);
+        score_array[i].resize(num_direct);
     }
     for (int k=0; k<num_surface; k++) {
         for (int i=0; i<num_direct; i++) {
@@ -153,7 +153,7 @@ void VB_Planner::VisibilityScoreAssign(std::vector<std::vector<float> >& score_a
     }
     // average filter -> vertical
     for (int i=0; i<num_direct; i++) {
-        for (int k=0; i<num_surface; k++) {
+        for (int k=0; k<num_surface; k++) {
             float score = 0;
             int counter = 0;
             for (int j=0; j<3; j++) {
@@ -204,7 +204,7 @@ void VB_Planner::FrontierScoreAssign(std::vector<std::vector<float> >& score_arr
     }
     // average filter -> vertical
     for (int i=0; i<num_direct; i++) {
-        for (int k=0; i<num_surface; k++) {
+        for (int k=0; k<num_surface; k++) {
             float score = 0;
             int counter = 0;
             for (int j=0; j<3; j++) {
@@ -296,7 +296,7 @@ bool VB_Planner::HitObstacle(Point3D p) {
     pcl::PointXYZI cloud_point;
     cloud_point.x = p.x;
     cloud_point.y = p.y;
-    cloud_point.z = robot_pos_.z;
+    cloud_point.z = p.z;
     kdtree_collision_cloud_->radiusSearch(cloud_point, collision_radius_, pointSearchInd, pointSearchSqDis);
     if (!pointSearchInd.empty()) {
         return true;
@@ -305,7 +305,10 @@ bool VB_Planner::HitObstacle(Point3D p) {
 }
 
 int VB_Planner::PointCounter(Point3D direction) {
-	// TODO! Counte frontier point in direction
+	/*CHANGE TODO! Count frontier point in drection 3D space 
+    Input: Direction 
+    Output: Frontier Score
+    */
     double yaw_mid = atan2(direction.y, direction.x);
     double yaw_upper = fmin(yaw_mid + direction_resolution_, M_PI_2);
     double yaw_low = fmax(yaw_mid + direction_resolution_, - M_PI_2);
@@ -347,8 +350,9 @@ void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
     geometry_msgs::Quaternion geo_quat = odom_msg.pose.pose.orientation;
     tf::Matrix3x3(tf::Quaternion(geo_quat.x, geo_quat.y, geo_quat.z, geo_quat.w)).getRPY(roll, pitch, yaw);
     // std::cout<<"Debug Yaw: "<< yaw << std::endl;
-    robot_heading_.x = cos(yaw);
-    robot_heading_.y = sin(yaw);
+    robot_heading_.x = cos(yaw) * cos(roll);
+    robot_heading_.y = sin(yaw) * cos(roll);
+    robot_heading_.z = sin(roll);
     // std::cout<<"Heading X: "<<  robot_heading_.x << "Heading Y: "<<  robot_heading_.y << std::endl;
     if (old_open_direction_ == Point3D(0,0,0)) {
         old_open_direction_ = robot_heading_;
@@ -359,11 +363,13 @@ void VB_Planner::UpdateRayCastingStack() {
     Point3D heading_right, heading_left;
     std::vector<Point3D> direct_stack;
     double angle_step;
+    old_open_direction_.z = 0.0;
     if (dead_end_) {
         old_open_direction_ = Point3D(0,0,0) - old_open_direction_; // if dead end -> inverse driection
     }
     double yaw = atan2(old_open_direction_.y, old_open_direction_.x);
-    double roll = atan2(old_open_direction_.z, this->Norm(Point3D(old_open_direction_.x, old_open_direction_.y, 0)));
+    // double roll = atan2(old_open_direction_.z, this->Norm(Point3D(old_open_direction_.x, old_open_direction_.y, 0)));
+    double roll = 0.0;
     switch (planner_type_)
     {
     case 0:
@@ -388,10 +394,10 @@ void VB_Planner::UpdateRayCastingStack() {
     direct_stack_3D_.push_back(direct_stack);
     double roll_up, roll_down;
     for (int k=1; k<BEANS; k++) {
-        roll_up = roll+k*ANG_RES_Y/180*M_PI;
-        roll_down = roll-k*ANG_RES_Y/180*M_PI;
+        roll_up = roll + k*ANG_RES_Y/180*M_PI;
+        roll_down = roll - k*ANG_RES_Y/180*M_PI;
         direct_stack.clear();
-        direct_stack.push_back(Point3D(old_open_direction_.x,old_open_direction_.y,sin(roll_up)));
+        direct_stack.push_back(Point3D(old_open_direction_.x*cos(roll_up),old_open_direction_.y*cos(roll_up),sin(roll_up)));
         for (int i=1; i<int(angle_resolution_/2); i++) {
             heading_right = Point3D(cos(yaw+i*angle_step)*cos(roll_up),sin(yaw+i*angle_step)*cos(roll_up), sin(roll_up));
             heading_left = Point3D(cos(yaw-i*angle_step)*cos(roll_up),sin(yaw-i*angle_step)*cos(roll_up),sin(roll_up));
@@ -400,7 +406,7 @@ void VB_Planner::UpdateRayCastingStack() {
         }
         direct_stack_3D_.push_back(direct_stack);
         direct_stack.clear();
-        direct_stack.push_back(Point3D(old_open_direction_.x,old_open_direction_.y,sin(roll_down)));
+        direct_stack.push_back(Point3D(old_open_direction_.x*cos(roll_down),old_open_direction_.y*cos(roll_down),sin(roll_down)));
         for (int i=1; i<int(angle_resolution_/2); i++) {
             heading_right = Point3D(cos(yaw+i*angle_step)*cos(roll_down),sin(yaw+i*angle_step)*cos(roll_down), sin(roll_down));
             heading_left = Point3D(cos(yaw-i*angle_step)*cos(roll_down),sin(yaw-i*angle_step)*cos(roll_down),sin(roll_down));
