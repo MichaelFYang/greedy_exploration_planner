@@ -1,6 +1,6 @@
 ray_cast_resolution : 100
 max_sensor_range: 15.0
-planner_type: 0;
+planner_type: 0
 obs_count_thred: 10
 dead_end_filter:  5
 dead_end_thred: 5.0

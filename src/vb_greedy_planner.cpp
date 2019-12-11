@@ -10,35 +10,35 @@ VB_Planner::VB_Planner() {
     if (!nh_.getParam("max_sensor_range",max_sensor_range_)) {
         max_sensor_range_ = 15.0;
     }
-    if (!nh_.getParam("planner_type",planner_type_)) {
+    if (!nh_.getParam("/vb_greedy_planner_node/planner_type",planner_type_)) {
         planner_type_ = 0;
     }
-    if (!nh_.getParam("obs_count_thred",obs_count_thred_)) {
+    if (!nh_.getParam("/vb_greedy_planner_node/obs_count_thred",obs_count_thred_)) {
         obs_count_thred_ = 10;
     }
-    if (!nh_.getParam("collision_radius",collision_radius_)) {
+    if (!nh_.getParam("/vb_greedy_planner_node/collision_radius",collision_radius_)) {
         collision_radius_ = 0.5;
     }
-    if (!nh_.getParam("angle_resolution",angle_resolution_)) {
+    if (!nh_.getParam("/vb_greedy_planner_node/angle_resolution",angle_resolution_)) {
         angle_resolution_ = 60;
     }
-    if (!nh_.getParam("dead_end_filter", dead_end_filter_)) {
+    if (!nh_.getParam("/vb_greedy_planner_node/dead_end_filter", dead_end_filter_)) {
         dead_end_filter_ = 5;
     }
-    if (!nh_.getParam("dead_end_thred", dead_end_thred_)) {
+    if (!nh_.getParam("/vb_greedy_planner_node/dead_end_thred", dead_end_thred_)) {
         dead_end_thred_ = 5.0;
     }
     // get topic name parameter
-    if (!nh_.getParam("vb_goal_topic", goal_topic_)) {
+    if (!nh_.getParam("/vb_greedy_planner_node/vb_goal_topic", goal_topic_)) {
         goal_topic_ = "/uav1/custom_waypoint";
     }
-    if (!nh_.getParam("vb_laser_topic",laser_topic_)) {
+    if (!nh_.getParam("/vb_greedy_planner_node/vb_laser_topic",laser_topic_)) {
         laser_topic_ = "/velodyne_cloud_registered";
     }
-    if (!nh_.getParam("vb_odom_topic",odom_topic_)) {
+    if (!nh_.getParam("/vb_greedy_planner_node/vb_odom_topic",odom_topic_)) {
         odom_topic_ = "/integrated_to_map";
     }
-    if (!nh_.getParam("vb_frontier_topic",frontier_topic_)) {
+    if (!nh_.getParam("/vb_greedy_planner_node/vb_frontier_topic",frontier_topic_)) {
         frontier_topic_ = "/frontier_cloud";
     }
    
@@ -72,6 +72,7 @@ void VB_Planner::Loop() {
     goal_pub_ = nh_.advertise<ROSWayPoint>(goal_topic_,1);
     point_cloud_sub_ = nh_.subscribe(laser_topic_,1,&VB_Planner::CloudHandler,this);
 	frontier_cloud_sub_ = nh_.subscribe(frontier_topic_,1,&VB_Planner::FrontierCloudHandler,this);
+
     odom_sub_ = nh_.subscribe(odom_topic_,1,&VB_Planner::OdomHandler,this);
 
     ros::Rate rate(1);
