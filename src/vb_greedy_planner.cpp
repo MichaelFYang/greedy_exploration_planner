@@ -4,10 +4,10 @@
 
 VB_Planner::VB_Planner() {
     // ROS Parameter Read 
-    if (!nh_.getParam("ray_cast_resolution",ray_cast_resolution_)) {
+    if (!nh_.getParam("/vb_greedy_planner_node/ray_cast_resolution",ray_cast_resolution_)) {
         ray_cast_resolution_ = 100;
     }
-    if (!nh_.getParam("max_sensor_range",max_sensor_range_)) {
+    if (!nh_.getParam("/vb_greedy_planner_node/max_sensor_range",max_sensor_range_)) {
         max_sensor_range_ = 15.0;
     }
     if (!nh_.getParam("/vb_greedy_planner_node/planner_type",planner_type_)) {
