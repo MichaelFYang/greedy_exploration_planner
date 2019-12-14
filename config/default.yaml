@@ -11,4 +11,4 @@ vb_frontier_topic: /frontier_cloud
 vb_laser_topic: /velodyne_cloud_registered
 vb_odom_topic: /integrated_to_map
 world_frame_id: world
-height_anaysis_step: 0.1
+height_anaysis_step: 0.2
