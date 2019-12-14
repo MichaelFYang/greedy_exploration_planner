@@ -328,6 +328,7 @@ void VB_Planner::UpdateRayCastingStack() {
     double angle_step;
     if (dead_end_) {
         old_open_direction_ = Direct25D(0,0,old_open_direction_.height) - old_open_direction_; // if dead end -> inverse driection
+        std::cout<<"Dead End Trigered"<<std::endl;
     }
     double yaw = atan2(old_open_direction_.y, old_open_direction_.x);
     // double roll = atan2(old_open_direction_.z, this->Norm(Point3D(old_open_direction_.x, old_open_direction_.y, 0)));
