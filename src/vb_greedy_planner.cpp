@@ -13,6 +13,9 @@ VB_Planner::VB_Planner() {
     if (!nh_.getParam("/vb_greedy_planner_node/planner_type",planner_type_)) {
         planner_type_ = 0;
     }
+    if (!nh_.getParam("/vb_greedy_planner_node/height_anaysis_step",height_anaysis_step_)) {
+        height_anaysis_step_ = 0.1;
+    }
     if (!nh_.getParam("/vb_greedy_planner_node/obs_count_thred",obs_count_thred_)) {
         obs_count_thred_ = 10;
     }
@@ -40,6 +43,9 @@ VB_Planner::VB_Planner() {
     }
     if (!nh_.getParam("/vb_greedy_planner_node/vb_frontier_topic",frontier_topic_)) {
         frontier_topic_ = "/frontier_cloud";
+    }
+    if (!nh_.getParam("/vb_greedy_planner_node/world_frame_id", robot_frame_id_)) {
+        robot_frame_id_ = "world";
     }
    
     // initial cloud
@@ -81,6 +87,7 @@ void VB_Planner::Loop() {
         ros::spinOnce(); // process all callback function
         //process
         if (!laser_cloud_->empty() || !frontier_cloud_->empty()) {
+            this->HeightAnaysis(ceil_height_, ground_height_);
             this->UpdateRayCastingStack();
             old_open_direction_ = this->OpenDirectionAnalysis();
             this->ElasticRayCast(); // update waypoint 
@@ -122,6 +129,7 @@ Point3D VB_Planner::OpenDirectionAnalysis() {
 void VB_Planner::VisibilityScoreAssign(std::vector<std::vector<float> >& score_array) {
 	int num_surface = direct_stack_3D_.size();
     int num_direct = direct_stack_3D_[0].size();
+    Point3D center_pos = robot_pos_;
 	score_array.clear();
 	score_array.resize(num_surface);
     std::vector<std::vector<float> > temp_score_stack;
@@ -132,7 +140,8 @@ void VB_Planner::VisibilityScoreAssign(std::vector<std::vector<float> >& score_a
     }
     for (int k=0; k<num_surface; k++) {
         for (int i=0; i<num_direct; i++) {
-            temp_score_stack[k][i] = this->rayCast(direct_stack_3D_[k][i]);
+            center_pos.z = direct_stack_3D_[k][i].z;
+            temp_score_stack[k][i] = this->RayCast(direct_stack_3D_[k][i], center_pos);
         }
     }
     // average filter -> horizontal
@@ -146,22 +155,6 @@ void VB_Planner::VisibilityScoreAssign(std::vector<std::vector<float> >& score_a
                 if (i==0) s = 1; 
                 if (i+j*s < num_direct) {
                     score += temp_score_stack[k][i+j*s];
-                    counter += 1;
-                }
-            }
-            score_array[k][i] = score / float(counter);
-        }
-    }
-    // average filter -> vertical
-    for (int i=0; i<num_direct; i++) {
-        for (int k=0; k<num_surface; k++) {
-            float score = 0;
-            int counter = 0;
-            for (int j=0; j<3; j++) {
-                int s = 2;
-                if (k==0) s = 1; 
-                if (k+j*s < num_surface) {
-                    score += temp_score_stack[k+j*s][i];
                     counter += 1;
                 }
             }
@@ -171,54 +164,7 @@ void VB_Planner::VisibilityScoreAssign(std::vector<std::vector<float> >& score_a
 }
 
 void VB_Planner::FrontierScoreAssign(std::vector<std::vector<float> >& score_array) {
-	int num_surface = direct_stack_3D_.size();
-    int num_direct = direct_stack_3D_[0].size();
-	score_array.clear();
-	score_array.reserve(num_surface);
-    std::vector<std::vector<float> > temp_score_stack;
-	temp_score_stack.reserve(num_surface);
-    for (int i=0; i<num_surface; i++) {
-        temp_score_stack[i].reserve(num_direct);
-        score_array[i].reserve(num_direct);
-    }
-    for (int k=0; k<num_surface; k++) {
-        for (int i=0; i<num_direct; i++) {
-            temp_score_stack[k][i] = this->PointCounter(direct_stack_3D_[k][i]);
-        }
-    }
-    // average filter -> horizontal
-    int filter_coeff = num_direct / 10;
-    for (int k=0; k<num_surface; k++) {
-        for (int i=0; i<num_direct; i++) {
-            float score = 0;
-            int counter = 0;
-            for (int j=0; j<filter_coeff; j++) {
-                int s = 2;
-                if (i==0) s = 1; 
-                if (i+j*s < num_direct) {
-                    score += temp_score_stack[k][i+j*s];
-                    counter += 1;
-                }
-            }
-            score_array[k][i] = score / float(counter);
-        }
-    }
-    // average filter -> vertical
-    for (int i=0; i<num_direct; i++) {
-        for (int k=0; k<num_surface; k++) {
-            float score = 0;
-            int counter = 0;
-            for (int j=0; j<3; j++) {
-                int s = 2;
-                if (k==0) s = 1; 
-                if (k+j*s < num_surface) {
-                    score += temp_score_stack[k+j*s][i];
-                    counter += 1;
-                }
-            }
-            score_array[k][i] = score / float(counter);
-        }
-    }
+	// TODO!
 }
 
 void VB_Planner::DeadEndAnalysis(double dist) {
@@ -254,7 +200,6 @@ void VB_Planner::ElasticRayCast() {
     while(counter < obs_count_thred_ && this->Norm(check_pos_principal - center_pos) < max_sensor_range_) {
         check_pos_principal.x += open_direction_.x / ray_cast_resolution_;
         check_pos_principal.y += open_direction_.y / ray_cast_resolution_;
-        check_pos_principal.z += open_direction_.z / ray_cast_resolution_;
 
         if (this->HitObstacle(check_pos_principal)) {
             counter += 1;
@@ -264,24 +209,18 @@ void VB_Planner::ElasticRayCast() {
     this->DeadEndAnalysis(dist); // update dead_end with limit time instances
     goal_waypoint_.pose.position.x = check_pos_principal.x;
     goal_waypoint_.pose.position.y = check_pos_principal.y;
-    goal_waypoint_.pose.position.z = check_pos_principal.z;
-
+    goal_waypoint_.pose.position.z = open_direction_.z;
 }
 
-float VB_Planner::rayCast(Point3D direction) {
+float VB_Planner::RayCast(Point3D direction, Point3D center_pos) {
     // Input: PointCloud; and Principal direction vector
     // Output: update goal waypoint -- the travel distance to an obstacle
     int counter = 0;
-    float center_x = robot_pos_.x;
-    float center_y = robot_pos_.y;
-    float center_z = robot_pos_.z;
-    Point3D center_pos = Point3D(center_x, center_y, center_z);
     Point3D check_pos_principal = center_pos;
     // principal direction
     while(counter < obs_count_thred_ && this->Norm(check_pos_principal - center_pos) < max_sensor_range_) {
         check_pos_principal.x += direction.x / ray_cast_resolution_;
         check_pos_principal.y += direction.y / ray_cast_resolution_;
-        check_pos_principal.z += direction.z / ray_cast_resolution_;
 
         if (this->HitObstacle(check_pos_principal)) {
             counter += 1;
@@ -361,8 +300,12 @@ void VB_Planner::OdomHandler(const nav_msgs::Odometry odom_msg) {
 }
 
 void VB_Planner::UpdateRayCastingStack() {
+    // Update it -> 2.5D 
     Point3D heading_right, heading_left;
     std::vector<Point3D> direct_stack;
+    int num_up_steps = int((ceil_height_ - robot_pos_.z)/height_anaysis_step_);
+    int num_down_steps = int((robot_pos_.z - ground_height_)/height_anaysis_step_);
+    float check_height = ground_height_;
     double angle_step;
     old_open_direction_.z = 0.0;
     if (dead_end_) {
@@ -370,7 +313,6 @@ void VB_Planner::UpdateRayCastingStack() {
     }
     double yaw = atan2(old_open_direction_.y, old_open_direction_.x);
     // double roll = atan2(old_open_direction_.z, this->Norm(Point3D(old_open_direction_.x, old_open_direction_.y, 0)));
-    double roll = 0.0;
     switch (planner_type_)
     {
     case 0:
@@ -384,38 +326,20 @@ void VB_Planner::UpdateRayCastingStack() {
         break;
     }
     direction_resolution_ = angle_step;
-    direct_stack.clear();
-    direct_stack.push_back(old_open_direction_);
-    for (int i=1; i<int(angle_resolution_/2); i++) {
-        heading_right = Point3D(cos(yaw+i*angle_step)*cos(roll),sin(yaw+i*angle_step)*cos(roll), sin(roll));
-        heading_left = Point3D(cos(yaw-i*angle_step)*cos(roll),sin(yaw-i*angle_step)*cos(roll),sin(roll));
-        direct_stack.push_back(heading_right);
-        direct_stack.push_back(heading_left);
-    }
-    direct_stack_3D_.push_back(direct_stack);
-    double roll_up, roll_down;
-    for (int k=1; k<BEANS; k++) {
-        roll_up = roll + k*ANG_RES_Y/180*M_PI;
-        roll_down = roll - k*ANG_RES_Y/180*M_PI;
+    for (int k=0; k<num_down_steps+num_up_steps; k++) {
+        check_height += height_anaysis_step_ * k;
+        old_open_direction_.z = check_height;
         direct_stack.clear();
-        direct_stack.push_back(Point3D(old_open_direction_.x*cos(roll_up),old_open_direction_.y*cos(roll_up),sin(roll_up)));
+        direct_stack.push_back(old_open_direction_);
         for (int i=1; i<int(angle_resolution_/2); i++) {
-            heading_right = Point3D(cos(yaw+i*angle_step)*cos(roll_up),sin(yaw+i*angle_step)*cos(roll_up), sin(roll_up));
-            heading_left = Point3D(cos(yaw-i*angle_step)*cos(roll_up),sin(yaw-i*angle_step)*cos(roll_up),sin(roll_up));
-            direct_stack.push_back(heading_right);
-            direct_stack.push_back(heading_left);
-        }
-        direct_stack_3D_.push_back(direct_stack);
-        direct_stack.clear();
-        direct_stack.push_back(Point3D(old_open_direction_.x*cos(roll_down),old_open_direction_.y*cos(roll_down),sin(roll_down)));
-        for (int i=1; i<int(angle_resolution_/2); i++) {
-            heading_right = Point3D(cos(yaw+i*angle_step)*cos(roll_down),sin(yaw+i*angle_step)*cos(roll_down), sin(roll_down));
-            heading_left = Point3D(cos(yaw-i*angle_step)*cos(roll_down),sin(yaw-i*angle_step)*cos(roll_down),sin(roll_down));
+            heading_right = Point3D(cos(yaw+i*angle_step),sin(yaw+i*angle_step), check_height);
+            heading_left = Point3D(cos(yaw-i*angle_step),sin(yaw-i*angle_step),check_height);
             direct_stack.push_back(heading_right);
             direct_stack.push_back(heading_left);
         }
         direct_stack_3D_.push_back(direct_stack);
     }
+    
 }
 
 void VB_Planner::LeftRotatePoint(pcl::PointXYZI &pnt) {
@@ -441,7 +365,7 @@ void VB_Planner::HandleWaypoint() {
     rviz_direction_.poses.push_back(pose);
     // publish waypoint;
     goal_waypoint_.header = odom_.header;
-    goal_waypoint_.header.frame_id = "world";
+    goal_waypoint_.header.frame_id = robot_frame_id_;
     goal_pub_.publish(goal_waypoint_);
     rviz_direct_pub_.publish(rviz_direction_);
     // std::cout << "Goal Publihsed ..." << std::endl;

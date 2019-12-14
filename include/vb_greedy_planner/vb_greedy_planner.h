@@ -64,6 +64,43 @@ struct Point3D {
     }
 };
 
+struct Direct25D {
+    float x;
+    float y;
+    float height;
+    Direct25D() {}
+    Direct25D(float _x, float _y, float _height): x(_x), y(_y), height(_height) {}
+    bool operator ==(const Direct25D& pt) const
+    {
+        return x == pt.x && y == pt.y && height == pt.height;
+    }
+
+    float operator *(const Direct25D& pt) const
+    {
+        return x * pt.x + y * pt.y;
+    }
+
+    Direct25D operator *(const float factor) const
+    {
+        return Direct25D(x*factor, y*factor, height);
+    }
+
+    Direct25D operator /(const float factor) const
+    {
+        return Direct25D(x/factor, y/factor, height);
+    }
+
+    Direct25D operator +(const Direct25D& pt) const
+    {
+        return Direct25D(x+pt.x, y+pt.y, height);
+    }
+    Direct25D operator -(const Direct25D& pt) const
+    {
+        return Direct25D(x-pt.x, y-pt.y, height);
+    }
+};
+
+
 
 class VB_Planner
 {
@@ -79,12 +116,13 @@ private:
     ros::Subscriber odom_sub_;
     ros::Publisher goal_pub_;
     ros::Publisher rviz_direct_pub_;
+    ros::Publisher marker_pub_;
     // function define
     Point3D CPoint(float x, float y, float z);
     float Norm(Point3D p);
     // Point3D PrincipalAnalysis();
     Point3D OpenDirectionAnalysis();
-    float rayCast(Point3D direction);
+    float RayCast(Point3D direction, Point3D center_pos);
     int PointCounter(Point3D direction);
     void ElasticRayCast();
     void InitializeParam();
@@ -102,9 +140,11 @@ private:
 	void FrontierScoreAssign(std::vector<std::vector<float> >& score_array);
     void UpdateFrontierDirectionArray(std::vector<double>& direction_array);
     void LeftRotatePoint(pcl::PointXYZI &pnt);
+    void HeightAnaysis(float& ceil_z, float& ground_z);
     // valuable define
     nav_msgs::Odometry odom_;
     bool dead_end_;
+    float ceil_height_, ground_height_;
     std::size_t frontier_size_;
     std::vector<double> max_score_stack_;
     Point3D robot_heading_;
@@ -129,6 +169,7 @@ private:
     // ros  parameter value
     int ray_cast_resolution_;
     int angle_resolution_;
+    float height_anaysis_step_;
     double direction_resolution_;
     float max_sensor_range_;
     int obs_count_thred_;
