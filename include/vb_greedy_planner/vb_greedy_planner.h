@@ -24,6 +24,7 @@
 #include <string>
 #include <math.h>
 #include <algorithm>
+#include <limits>
 
 typedef geometry_msgs::PoseStamped ROSWayPoint; 
 

@@ -191,13 +191,27 @@ void VB_Planner::DeadEndAnalysis(double dist) {
 }
 
 void VB_Planner::HeightAnaysis(float& ceil_z, float& ground_z) {
-    /*TODO!*/
+    /*TODO!
+    Max & Min height
+    */
+    float temp_ceil_z = - std::numeric_limits<float>::max();
+    float temp_ground_z = std::numeric_limits<float>::max();
+    std::size_t laser_cloud_size = laser_cloud_->points.size();
+    for (std::size_t i=0; i<laser_cloud_size; i++) {
+        float height = laser_cloud_->points[i].z;
+        if (height > temp_ceil_z) temp_ceil_z = height;
+        if (height < temp_ground_z) temp_ground_z = height;
+    }
+    ceil_z = robot_pos_.z + height_anaysis_step_;
+    ground_z = robot_pos_.z - height_anaysis_step_;
+    std::cout<<"Ceil Height: "<<ceil_z<<std::endl;
+    std::cout<<"Ground Heigh: "<<ground_z<<std::endl;
 }
 
 void VB_Planner::ElasticRayCast() {
     // TODO -> Right now is the simple version of ray casting
     int counter = 0;
-    Point3D center_pos = Point3D(robot_pos_.x, robot_pos_.y, robot_pos_.z);
+    Point3D center_pos = Point3D(robot_pos_.x, robot_pos_.y, open_direction_.height);
     Point3D check_pos_principal = center_pos;
     // principal direction
     double dist = this->Norm(check_pos_principal - center_pos);

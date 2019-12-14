@@ -4,11 +4,11 @@ planner_type: 0
 obs_count_thred: 10
 dead_end_filter:  5
 dead_end_thred: 5.0
-collision_radius: 0.5
+collision_radius: 1.0
 angle_resolution: 60
 vb_goal_topic: /uav1/custom_waypoint
 vb_frontier_topic: /frontier_cloud
 vb_laser_topic: /velodyne_cloud_registered
 vb_odom_topic: /integrated_to_map
 world_frame_id: world
-height_anaysis_step: 0.1
+height_anaysis_step: 0.5
